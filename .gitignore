@@ -1,0 +1,46 @@
+# --- Local playground (tickets 000/001 experiments — never pushed) ---
+playground/
+
+# --- Rust ---
+target/
+**/*.rs.bk
+*.pdb
+# Keep Cargo.lock for binaries; ignore for libs. Uncomment if this stays a lib crate.
+# Cargo.lock
+
+# --- Go ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work.sum
+
+# --- Node / TypeScript / Vite (web/) ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Editors / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Misc build/bench artifacts ---
+bench/results/*.tmp
