@@ -42,5 +42,6 @@ yarn-error.log*
 *.swp
 *~
 
+.claude
 # --- Misc build/bench artifacts ---
 bench/results/*.tmp
