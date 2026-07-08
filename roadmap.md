@@ -363,8 +363,8 @@ gradient-engine/
 ## 9. Progress Overview
 
 ### Phase 0 — Rust warmup & setup
-- [ ] `TICKET-000` Rust toolchain + warmup exercises
-- [ ] `TICKET-001` Engine crate skeleton + workspace
+- [X] `TICKET-000` Rust toolchain + warmup exercises
+- [X] `TICKET-001` Engine crate skeleton + workspace
 
 ### Phase 1 — Autodiff core on hand-built graphs ⭐ (the math, and the key Rust learning)
 - [ ] `TICKET-100` Arena graph representation (`Vec<Node>` + indices)
