@@ -98,6 +98,6 @@ mod tests {
             adjoint: 0.0,
         });
         assert!(g.nodes[m1].inputs.contains(&x)); // x is an input of m1
-        assert!(g.nodes[m2].inputs.contains(&x)); // x is ALSO an input of m2       }); // x * z
+        assert!(g.nodes[m2].inputs.contains(&x)); // x is ALSO an input of m2
     }
 }
