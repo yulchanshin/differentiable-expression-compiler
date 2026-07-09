@@ -60,3 +60,30 @@ impl Graph {
         self.nodes[self.nodes.len() - 1].value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn sin_xy_plus_x_sqr() {
+        let mut g = Graph::new();
+        let x = g.var("x".into());
+        let y = g.var("y".into());
+        let xy = g.mul(x, y);
+        let x_sqr = g.pow(x, 2.0);
+        let sin_xy = g.sin(xy);
+        let _f = g.add(sin_xy, x_sqr);
+
+        let inputs = HashMap::from([("x".to_string(), 1.5), ("y".to_string(), 2.0)]);
+
+        // x is ONE node shared by mul and pow
+        assert!(g.nodes[xy].inputs.contains(&x));
+        assert!(g.nodes[x_sqr].inputs.contains(&x));
+        assert_eq!(g.nodes.len(), 6); // 6 nodes total; x isn't copied       
+
+        let result = g.forward(&inputs);
+        let expected = (1.5_f64 * 2.0).sin() + 1.5_f64.powi(2); // sin(3.0) + 2.25
+
+        assert!((result - expected).abs() < 1e-9);
+    }
+}

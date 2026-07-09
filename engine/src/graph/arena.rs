@@ -12,22 +12,22 @@
 
 use crate::graph::node::{Node, OpType};
 
-struct Graph {
-    nodes: Vec<Node>,
+pub struct Graph {
+    pub nodes: Vec<Node>,
 }
 
 impl Graph {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Graph { nodes: Vec::new() }
     }
 
-    fn push(&mut self, node: Node) -> usize {
+    pub fn push(&mut self, node: Node) -> usize {
         let len: usize = self.nodes.len();
         self.nodes.push(node);
         len
     }
 
-    fn var(&mut self, name: String) -> usize {
+    pub fn var(&mut self, name: String) -> usize {
         self.push(Node {
             op: OpType::Var(name),
             inputs: vec![],
@@ -36,7 +36,7 @@ impl Graph {
         })
     }
 
-    fn constant(&mut self, val: f64) -> usize {
+    pub fn constant(&mut self, val: f64) -> usize {
         self.push(Node {
             op: OpType::Const(val),
             inputs: vec![],
@@ -45,7 +45,7 @@ impl Graph {
         })
     }
 
-    fn add(&mut self, a: usize, b: usize) -> usize {
+    pub fn add(&mut self, a: usize, b: usize) -> usize {
         self.push(Node {
             op: OpType::Add,
             inputs: vec![a, b],
@@ -54,7 +54,7 @@ impl Graph {
         })
     }
 
-    fn sub(&mut self, a: usize, b: usize) -> usize {
+    pub fn sub(&mut self, a: usize, b: usize) -> usize {
         self.push(Node {
             op: OpType::Sub,
             inputs: vec![a, b],
@@ -63,7 +63,7 @@ impl Graph {
         })
     }
 
-    fn div(&mut self, a: usize, b: usize) -> usize {
+    pub fn div(&mut self, a: usize, b: usize) -> usize {
         self.push(Node {
             op: OpType::Div,
             inputs: vec![a, b],
@@ -72,7 +72,7 @@ impl Graph {
         })
     }
 
-    fn mul(&mut self, a: usize, b: usize) -> usize {
+    pub fn mul(&mut self, a: usize, b: usize) -> usize {
         self.push(Node {
             op: OpType::Mul,
             inputs: vec![a, b],
@@ -81,7 +81,7 @@ impl Graph {
         })
     }
 
-    fn neg(&mut self, a: usize) -> usize {
+    pub fn neg(&mut self, a: usize) -> usize {
         self.push(Node {
             op: OpType::Neg,
             inputs: vec![a],
@@ -90,7 +90,7 @@ impl Graph {
         })
     }
 
-    fn pow(&mut self, a: usize, exp: f64) -> usize {
+    pub fn pow(&mut self, a: usize, exp: f64) -> usize {
         self.push(Node {
             op: OpType::Pow(exp),
             inputs: vec![a],
@@ -99,7 +99,7 @@ impl Graph {
         })
     }
 
-    fn sin(&mut self, a: usize) -> usize {
+    pub fn sin(&mut self, a: usize) -> usize {
         self.push(Node {
             op: OpType::Sin,
             inputs: vec![a],
@@ -108,7 +108,7 @@ impl Graph {
         })
     }
 
-    fn cos(&mut self, a: usize) -> usize {
+    pub fn cos(&mut self, a: usize) -> usize {
         self.push(Node {
             op: OpType::Cos,
             inputs: vec![a],
@@ -117,7 +117,7 @@ impl Graph {
         })
     }
 
-    fn exp(&mut self, a: usize) -> usize {
+    pub fn exp(&mut self, a: usize) -> usize {
         self.push(Node {
             op: OpType::Exp,
             inputs: vec![a],
@@ -126,7 +126,7 @@ impl Graph {
         })
     }
 
-    fn ln(&mut self, a: usize) -> usize {
+    pub fn ln(&mut self, a: usize) -> usize {
         self.push(Node {
             op: OpType::Ln,
             inputs: vec![a],
@@ -173,7 +173,7 @@ mod tests {
         let mut g = Graph::new();
         let x = g.var("x".into());
         let y = g.var("y".into());
-        let xy = g.mul(x, y);
-        let x_sqr = g.pow(x, 2.0);
+        let _xy = g.mul(x, y);
+        let _x_sqr = g.pow(x, 2.0);
     }
 }
