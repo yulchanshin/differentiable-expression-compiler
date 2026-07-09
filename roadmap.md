@@ -388,6 +388,11 @@ gradient-engine/
 - [ ] `TICKET-401` Common-subexpression elimination
 - [ ] `TICKET-402` Dead-node elimination + node-count benchmark
 
+### Phase 4B — Symbolic differentiation (optional extension)
+- [ ] `TICKET-410` Symbolic derivative graph builder
+- [ ] `TICKET-411` Expression simplifier
+- [ ] `TICKET-412` Pretty-printer (graph → formula) + expose the mode
+
 ### Phase 5 — Solvers
 - [ ] `TICKET-500` LU linear solver
 - [ ] `TICKET-501` Newton's method
@@ -782,6 +787,106 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 🦀 **Rust concepts introduced:** graph traversal (reachability) over the arena; `Vec<bool>` mark sets; index renumbering with a remap table.
 
 **Learn/read:** reachability-based DCE; presenting optimization wins quantitatively.
+
+---
+
+### PHASE 4B — Symbolic differentiation (optional extension)
+
+> **Where this fits:** after Phase 4 (optimization passes), because it reuses the same "traverse the graph applying per-op rules" machinery and it *wants* the simplifier, which is close cousin to constant folding + CSE. It depends only on Phases 1–2 (graph, ops, local derivative rules) existing.
+>
+> **Sequencing — do this before TICKET-600 (the HTTP service).** It's optional, but if you build it, build it *before Phase 6*, not after. This keeps all Rust work contiguous (no context-switch out to Go/TS and back just to add one feature), lets the simplifier lean on the Phase 4 optimizer you just wrote, and — most importantly — lets TICKET-600 expose `/derivative` alongside `/eval`, `/grad`, etc. in a single pass. Add it after the service exists and you're retrofitting the Rust service *and* the Go BFF for one endpoint. Order: Phase 4 → **4B** → Phase 5 → Phase 6 (service exposes symbolic diff with everything else) → Go/frontend.
+>
+> **Why it's cleanly additive:** symbolic diff *reads* the existing graph and *produces a new graph*. It changes nothing in your forward pass, backward pass, parser, or node representation — it's one more pass over the IR. This is the payoff of keeping the graph as a first-class intermediate representation, and it's a strong interview point: "because the graph is a first-class IR, adding a symbolic-differentiation mode was purely additive."
+>
+> **What it gives you:** a second differentiation mode that outputs the *closed-form derivative expression* (a formula), alongside the numeric gradients your autodiff already produces. Contrast worth stating in the README: reverse-mode AD gives exact gradient *numbers* at a point in one pass; this mode gives the derivative *formula*.
+
+---
+
+#### TICKET-410 — Symbolic derivative graph builder
+**Branch:** `feat/410-symbolic-diff`
+
+**Description:** Add a mode that, given an expression graph and a variable, builds a *new* graph representing the exact derivative expression `∂f/∂var`. Same local rules as autodiff, but each node emits new graph nodes instead of accumulating numbers.
+
+**Detail:**
+- New function `derivative(&mut self, node: usize, var: &str) -> usize` that returns the index of a newly-built node representing the derivative of `node` with respect to `var`. It recurses into inputs and combines their derivatives using the differentiation rules below, creating new nodes via your existing builder helpers (`add`, `mul`, etc.).
+- The differentiation rules (each *builds nodes*, it does not compute numbers):
+  - `D(Const) = 0`
+  - `D(Var x)` wrt `x` = `1`; wrt any other var = `0`
+  - `D(a + b) = D(a) + D(b)`
+  - `D(a − b) = D(a) − D(b)`
+  - `D(a * b) = D(a)*b + a*D(b)` (product rule)
+  - `D(a / b) = (D(a)*b − a*D(b)) / b²` (quotient rule)
+  - `D(a^k) = k * a^(k−1) * D(a)` (power + chain)
+  - `D(sin a) = cos(a) * D(a)`
+  - `D(cos a) = −sin(a) * D(a)`
+  - `D(exp a) = exp(a) * D(a)`
+  - `D(ln a) = D(a) / a`
+  - `D(−a) = −D(a)`
+- **Memoize** `(node, var) → derivative_node` in a `HashMap` so shared subexpressions don't get differentiated repeatedly (mirrors why the graph shares nodes in the first place).
+- Note the output is a raw, *unsimplified* derivative graph — it will be bloated (expression swell). TICKET-411 fixes readability; this ticket just needs to be *correct*.
+
+**Acceptance criteria:**
+- [ ] `D(sin(x*y) + x²)` wrt `x` produces a graph that, when evaluated numerically, matches the autodiff gradient's `∂f/∂x` at several random points (this is a beautiful cross-check: your two differentiation modes must agree).
+- [ ] `D` wrt a variable the expression doesn't contain yields a graph that evaluates to `0`.
+- [ ] Memoization: a shared subexpression is differentiated once, not once per parent (assert via a counter or node-count check).
+
+🦀 **Rust concepts introduced:** recursion returning arena indices (same shape as `lower` in TICKET-302); `HashMap<(usize, String), usize>` memo keyed by a tuple; reusing your own builder API to compose new nodes; the idea that a function can *read* and *grow* the same arena (watch the borrow checker here — build child derivatives first, capture their indices, then create the parent node, same read-locals-then-write discipline as the backward pass).
+
+**Learn/read:** the differentiation rules above (they're just §4.3 restated as expression-building instead of number-pushing); "symbolic differentiation" overview; why expression swell happens without simplification.
+
+---
+
+#### TICKET-411 — Expression simplifier
+**Branch:** `feat/411-simplifier`
+
+**Description:** A rewrite pass that shrinks a graph by applying algebraic identities. Essential for making TICKET-410's output readable (raw symbolic derivatives are enormous), and independently useful as another optimization pass.
+
+**Detail:**
+- A pass `simplify(&mut self, root: usize) -> usize` that repeatedly applies local rewrite rules until no rule fires (fixpoint):
+  - `x + 0 → x`, `0 + x → x`
+  - `x − 0 → x`, `x − x → 0`
+  - `x * 1 → x`, `1 * x → x`
+  - `x * 0 → 0`, `0 * x → 0`
+  - `x / 1 → x`
+  - `x^1 → x`, `x^0 → 1`
+  - `−(−x) → x`
+  - constant folding (reuse TICKET-400 — two all-constant inputs collapse to one `Const`)
+- Combine with CSE (TICKET-401) so structurally-identical subtrees created during differentiation merge.
+- Apply after `derivative()` to produce a clean derivative graph.
+
+**Acceptance criteria:**
+- [ ] Each rewrite rule has a unit test (`x*1` → `x`, `x+0` → `x`, etc.).
+- [ ] Simplifying a symbolic derivative meaningfully reduces node count vs. the raw version (assert a drop).
+- [ ] **Value-preserving property test:** simplified graph evaluates identically to the original at random points (a simplifier that changes results is broken).
+
+🦀 **Rust concepts introduced:** pattern-matching on node op + input shapes to detect rewrite opportunities; in-place graph rewriting / index redirection; fixpoint iteration (`loop { if !changed { break } }`); `#[derive(PartialEq)]` for structural comparison. Very close in spirit to your constant-folding pass, so it reinforces Phase 4.
+
+**Learn/read:** term-rewriting / algebraic simplification basics; why fixpoint iteration (one rule can enable another); the risk of non-terminating rewrite sets (keep rules strictly size-reducing).
+
+---
+
+#### TICKET-412 — Pretty-printer (graph → formula string) + expose the mode
+**Branch:** `feat/412-pretty-print`
+
+**Description:** Turn a graph back into a human-readable formula string, and expose the symbolic-derivative mode via the CLI/service so it's demoable. This closes the loop: text in → derivative formula out.
+
+**Detail:**
+- `fn to_string(&self, node: usize) -> String` that recursively renders a node as an infix expression, inserting parentheses only where precedence requires them (so you don't emit `x + y * z` as `(x + (y * z))` unnecessarily, nor drop needed parens).
+- Track operator precedence during rendering to decide parenthesization (the inverse of the Pratt parser's job — a nice symmetry to note).
+- Wire up a path that takes an expression + variable and returns the simplified derivative *as a formula string*. Since 4B lands before Phase 6 (see the sequencing note above), TICKET-600 exposes this as a `POST /derivative` endpoint alongside `/eval`, `/grad`, etc. — build it in that same pass. A CLI subcommand is the fine standalone alternative if you reach this before the service exists.
+
+**Acceptance criteria:**
+- [ ] `to_string` round-trips: parsing a printed formula and re-printing yields an equivalent formula.
+- [ ] `d/dx [sin(x*y) + x^2]` returns a readable, correctly-parenthesized formula string (e.g. `cos(x*y)*y + 2*x` after simplification).
+- [ ] The mode is reachable end-to-end (CLI or HTTP) and its output numerically matches the autodiff gradient.
+
+🦀 **Rust concepts introduced:** implementing `std::fmt::Display` for a node/graph (the idiomatic Rust way to define "how this prints"); recursive string building; precedence-aware formatting; optionally `write!`/`fmt::Formatter`. A clean, satisfying ticket that produces a visibly cool artifact (formulas out of your compiler).
+
+**Learn/read:** `impl Display`; operator-precedence-aware pretty-printing; the symmetry between parsing (string → tree) and printing (tree → string).
+
+---
+
+**Resume/README line this unlocks:** *"Extended the engine with a symbolic-differentiation mode that emits closed-form derivative expressions, built as an additive pass over the shared computation-graph IR, with an algebraic simplifier to control expression growth."* Note it appears as a distinct capability from the numeric autodiff, showing the IR's extensibility.
 
 ---
 
