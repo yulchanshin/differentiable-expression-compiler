@@ -1,5 +1,14 @@
-//arena.rs
-//!description will be written when i write this file
+//! Arena Representation of the computation Graph
+//!
+//! All nodes of a graph live in one `Vec<Node>` that owns them.
+//! Nodes refer to each other by `usize` index and not by `Rc`.
+//!
+//! Why indices instead of `Rc<RefCell<Node>>`:
+//!
+//! `Rc` allows the nodes to have multiple owners and `RefCell` allows
+//! these `Rc` nodes to be mutable. Therefore, there is a chance of a
+//! runtime panic happening due to `RefCell`'s runtime borrow checking.
+//! With `Vec<Node>` this shouldn't be an issue as we enforce single ownership.
 
 use crate::graph::node::{Node, OpType};
 
