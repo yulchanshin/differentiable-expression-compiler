@@ -367,7 +367,7 @@ gradient-engine/
 - [X] `TICKET-001` Engine crate skeleton + workspace
 
 ### Phase 1 — Autodiff core on hand-built graphs ⭐ (the math, and the key Rust learning)
-- [ ] `TICKET-100` Arena graph representation (`Vec<Node>` + indices)
+- [X] `TICKET-100` Arena graph representation (`Vec<Node>` + indices)
 - [ ] `TICKET-101` `OpType` enum + hand-construction helpers
 - [ ] `TICKET-102` Forward evaluation (topological order)
 - [ ] `TICKET-103` Reverse-mode backward pass (the AD core)
