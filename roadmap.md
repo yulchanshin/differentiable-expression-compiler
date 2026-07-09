@@ -368,8 +368,8 @@ gradient-engine/
 
 ### Phase 1 — Autodiff core on hand-built graphs ⭐ (the math, and the key Rust learning)
 - [X] `TICKET-100` Arena graph representation (`Vec<Node>` + indices)
-- [ ] `TICKET-101` `OpType` enum + hand-construction helpers
-- [ ] `TICKET-102` Forward evaluation (topological order)
+- [X] `TICKET-101` `OpType` enum + hand-construction helpers
+- [X] `TICKET-102` Forward evaluation (topological order)
 - [ ] `TICKET-103` Reverse-mode backward pass (the AD core)
 - [ ] `TICKET-104` Finite-difference oracle (validation harness)
 
@@ -446,9 +446,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Recommended: first ~4 chapters of *The Rust Book* (rust-lang.org/book) or `rustlings` exercises for stages A–C.
 
 **Acceptance criteria:**
-- [ ] `cargo build` / `cargo test` work.
-- [ ] You can explain, in a sentence, why exercise 4 fails to compile (one mutable XOR many shared borrows).
-- [ ] The four exercises pass their asserts.
+- [X] `cargo build` / `cargo test` work.
+- [X] You can explain, in a sentence, why exercise 4 fails to compile (one mutable XOR many shared borrows).
+- [X] The four exercises pass their asserts.
 
 🦀 **Rust concepts introduced:** Stage A (cargo, `let`/`mut`, functions, `Vec`, `for`, `println!`/`dbg!`) and first contact with Stage B (`&` vs `&mut`, the borrow rule) and Stage C (`enum`, `match`).
 
@@ -468,8 +468,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Repo root holds the Go/`web` dirs later; keep the Rust crate self-contained under `engine/`.
 
 **Acceptance criteria:**
-- [ ] `cargo build` and `cargo test` pass on the empty skeleton.
-- [ ] Module tree matches §8; each module compiles.
+- [X] `cargo build` and `cargo test` pass on the empty skeleton.
+- [X] Module tree matches §8; each module compiles.
 
 🦀 **Rust concepts introduced:** crate vs module (`mod`, `pub`, `use`), library vs binary crate, `lib.rs` as crate root, doc comments (`//!`, `///`).
 
@@ -495,9 +495,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - **Understand deeply why this beats `Rc<RefCell<Node>>`:** every node lives in one owner (the `Vec`); indices are `Copy` numbers you pass around freely; a node with two parents is just an index appearing in two `inputs` lists — no ownership conflict. Write a comment in `arena.rs` explaining this in your own words (it cements the lesson and is great interview prep).
 
 **Acceptance criteria:**
-- [ ] You can build a graph for `x * y` by hand: push two var nodes, then a `mul` node referencing their indices; assert the structure.
-- [ ] A shared node (`x` used twice) is a single index appearing in two inputs lists — demonstrated in a test.
-- [ ] `arena.rs` contains your own-words explanation of why indices beat pointers here.
+- [X] You can build a graph for `x * y` by hand: push two var nodes, then a `mul` node referencing their indices; assert the structure.
+- [X] A shared node (`x` used twice) is a single index appearing in two inputs lists — demonstrated in a test.
+- [X] `arena.rs` contains your own-words explanation of why indices beat pointers here.
 
 🦀 **Rust concepts introduced (⭐ Stage D — the big one):** the arena pattern; `usize` indices as handles; why `Copy` types (indices) sidestep ownership; `struct` with fields; `Vec<T>` as an owner; `&mut self` methods; `derive(Debug, Clone)`. This is the ticket where Rust's ownership model *clicks* for graphs.
 
@@ -524,9 +524,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Track which index is an input variable (name → index map, or a `Vec` of var indices).
 
 **Acceptance criteria:**
-- [ ] The `sin(x*y) + x^2` graph builds with the helpers in a few readable lines.
-- [ ] `match`ing on `OpType` is exhaustive (compiler enforces it — lean on that).
-- [ ] Test asserts the node count and structure of a couple of hand-built expressions.
+- [X] The `sin(x*y) + x^2` graph builds with the helpers in a few readable lines.
+- [X] `match`ing on `OpType` is exhaustive (compiler enforces it — lean on that).
+- [X] Test asserts the node count and structure of a couple of hand-built expressions.
 
 🦀 **Rust concepts introduced (Stage C deepened):** `enum` variants that carry data (`Pow(f64)`, `Var(String)`); exhaustive `match` and how the compiler *forces* you to handle every op (a feature — it catches missing cases); method chaining/builder ergonomics; `String` ownership in `Var`.
 
@@ -545,8 +545,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Guard: `Var` reads from the inputs map; error if missing (return `Result` — see TICKET-104/200, or `panic!` for now and upgrade later).
 
 **Acceptance criteria:**
-- [ ] `f(x,y)=sin(x*y)+x^2` at `(1.5, 2.0)` matches a hand/Python-computed value to 1e-9.
-- [ ] A shared subexpression is computed once, not twice.
+- [X] `f(x,y)=sin(x*y)+x^2` at `(1.5, 2.0)` matches a hand/Python-computed value to 1e-9.
+- [X] A shared subexpression is computed once, not twice.
 
 🦀 **Rust concepts introduced (Stage E):** iterating a `Vec` by index; reading one element while the loop proceeds; `match` returning values; `HashMap<String,f64>` lookups (`.get()` returns `Option`); `f64` methods (`.sin()`, `.powf()`, `.exp()`, `.ln()`).
 
