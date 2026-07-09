@@ -167,4 +167,20 @@ mod tests {
         assert!(g.nodes[m1].inputs.contains(&x)); // x is an input of m1
         assert!(g.nodes[m2].inputs.contains(&x)); // x is ALSO an input of m2
     }
+
+    #[test]
+    fn sin_multivar() {
+        let mut g = Graph::new();
+        let x = g.var("x".into());
+        let y = g.var("y".into());
+        let xy = g.mul(x, y);
+        let x_sqr = g.pow(x, 2.0);
+        let sin_xy = g.sin(xy);
+        let sin_xy_plus_x_sqr = g.add(sin_xy, x_sqr);
+        assert_eq!(g.nodes.len(), 6); // x, y, xy, x_sqr, sin_xy, f
+        assert_eq!(g.nodes[sin_xy_plus_x_sqr].inputs, vec![sin_xy, x_sqr]);
+        assert_eq!(g.nodes[xy].inputs, vec![x, y]);
+        assert_eq!(g.nodes[sin_xy].inputs, vec![xy]); // sin is unary
+        assert!(g.nodes[x_sqr].inputs.contains(&x)); // x shared: in xy AND x_sqr
+    }
 }
