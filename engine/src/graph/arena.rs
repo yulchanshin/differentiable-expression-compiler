@@ -26,6 +26,114 @@ impl Graph {
         self.nodes.push(node);
         len
     }
+
+    fn var(&mut self, name: String) -> usize {
+        self.push(Node {
+            op: OpType::Var(name),
+            inputs: vec![],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn constant(&mut self, val: f64) -> usize {
+        self.push(Node {
+            op: OpType::Const(val),
+            inputs: vec![],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn add(&mut self, a: usize, b: usize) -> usize {
+        self.push(Node {
+            op: OpType::Add,
+            inputs: vec![a, b],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn sub(&mut self, a: usize, b: usize) -> usize {
+        self.push(Node {
+            op: OpType::Sub,
+            inputs: vec![a, b],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn div(&mut self, a: usize, b: usize) -> usize {
+        self.push(Node {
+            op: OpType::Div,
+            inputs: vec![a, b],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn mul(&mut self, a: usize, b: usize) -> usize {
+        self.push(Node {
+            op: OpType::Mul,
+            inputs: vec![a, b],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn neg(&mut self, a: usize) -> usize {
+        self.push(Node {
+            op: OpType::Neg,
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn pow(&mut self, a: usize, exp: f64) -> usize {
+        self.push(Node {
+            op: OpType::Pow(exp),
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn sin(&mut self, a: usize) -> usize {
+        self.push(Node {
+            op: OpType::Sin,
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn cos(&mut self, a: usize) -> usize {
+        self.push(Node {
+            op: OpType::Cos,
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn exp(&mut self, a: usize) -> usize {
+        self.push(Node {
+            op: OpType::Exp,
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
+
+    fn ln(&mut self, a: usize) -> usize {
+        self.push(Node {
+            op: OpType::Ln,
+            inputs: vec![a],
+            value: 0.0,
+            adjoint: 0.0,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -35,68 +143,27 @@ mod tests {
     #[test]
     fn builds_x_times_y() {
         let mut g = Graph::new();
-        let x = g.push(Node {
-            op: OpType::Var,
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        });
+        let x = g.var("x".into());
+        let y = g.var("y".into());
+        let z = g.mul(x, y);
 
-        let y = g.push(Node {
-            op: OpType::Var,
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        });
-
-        let z = g.push(Node {
-            op: OpType::Mul,
-            inputs: vec![x, y],
-            value: 0.0,
-            adjoint: 0.0,
-        });
-
-        assert_eq!(0, x);
-        assert_eq!(1, y);
-        assert_eq!(2, z);
-        assert_eq!(vec![x, y], g.nodes[2].inputs);
-        assert_eq!(3, g.nodes.len());
+        assert_eq!(x, 0);
+        assert_eq!(y, 1);
+        assert_eq!(z, 2);
+        assert_eq!(g.nodes[z].inputs, vec![x, y]);
+        assert_eq!(g.nodes.len(), 3);
     }
 
     #[test]
     fn shared_node_appears_twice() {
         let mut g = Graph::new();
-        let x = g.push(Node {
-            op: OpType::Var,
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        }); // index 0
-        let y = g.push(Node {
-            op: OpType::Var,
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        }); // index 1
-        let z = g.push(Node {
-            op: OpType::Var,
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        }); // index 2
+        let x = g.var("x".into());
+        let y = g.var("y".into());
+        let z = g.var("z".into());
 
-        let m1 = g.push(Node {
-            op: OpType::Mul,
-            inputs: vec![x, y],
-            value: 0.0,
-            adjoint: 0.0,
-        }); // x * y
-        let m2 = g.push(Node {
-            op: OpType::Mul,
-            inputs: vec![x, z],
-            value: 0.0,
-            adjoint: 0.0,
-        });
+        let m1 = g.mul(x, y); // x * y
+        let m2 = g.mul(x, z); // x * z
+
         assert!(g.nodes[m1].inputs.contains(&x)); // x is an input of m1
         assert!(g.nodes[m2].inputs.contains(&x)); // x is ALSO an input of m2
     }

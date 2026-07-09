@@ -8,6 +8,16 @@ pub struct Node {
 }
 
 pub enum OpType {
-    Var,
+    Var(String),
+    Const(f64),
+    Add,
+    Sub,
+    Div,
     Mul,
+    Neg,
+    Pow(f64),
+    Sin,
+    Cos,
+    Exp,
+    Ln,
 }
