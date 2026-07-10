@@ -5,7 +5,7 @@ use std::collections::HashMap;
 // Index order is a valid topological order: builder helpers always push a
 // node's inputs before the node itself, so every input sits at a lower index.
 impl Graph {
-    fn forward(&mut self, inputs: &HashMap<String, f64>) -> f64 {
+    pub fn forward(&mut self, inputs: &HashMap<String, f64>) -> f64 {
         for i in 0..self.nodes.len() {
             let value = match &self.nodes[i].op {
                 OpType::Const(c) => *c,
