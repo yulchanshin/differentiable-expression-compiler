@@ -22,7 +22,7 @@ fn numerical_gradient(
         let f_plus: f64 = f(&modified);
         modified.insert(key.clone(), base - h);
         let f_minus: f64 = f(&modified);
-        modified.insert(key.clone(), base); //restore 
+        modified.insert(key.clone(), base); // restore
         grad.insert(key.clone(), (f_plus - f_minus) / (2.0 * h));
     }
     grad
@@ -42,7 +42,7 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
         gg.forward(inputs)
     };
 
-    let num_grad: HashMap<String, f64> = numerical_gradient(f, point, 1e-5);
+    let num_grad: HashMap<String, f64> = numerical_gradient(f, point, H);
 
     for key in point.keys() {
         assert!(
@@ -54,7 +54,25 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
     }
 }
 
-const TOLERANCE: f64 = 1e-6;
+const TOLERANCE: f64 = 1e-6; // AD-vs-numerical agreement threshold
+const H: f64 = 1e-5; // central-difference step size
+const N_POINTS: usize = 10; // random points probed per expression
+
+// Probe `build` at N_POINTS random points, each variable in `vars` drawn
+// uniformly from [low, high), asserting AD matches the numerical oracle.
+// `build` needs `+ Copy` because `check` takes it by value and we call it
+// once per point; non-capturing closures are Copy, so this is satisfied.
+fn check_random(build: impl Fn(&mut Graph) -> usize + Copy, vars: &[&str], low: f64, high: f64) {
+    let mut rng = rand::rng();
+    for _ in 0..N_POINTS {
+        let point: HashMap<String, f64> = vars
+            .iter()
+            .map(|v| (v.to_string(), rng.random_range(low..high)))
+            .collect();
+        check(build, &point, TOLERANCE);
+    }
+}
+
 // x + 1
 #[test]
 fn add() {
@@ -63,12 +81,7 @@ fn add() {
         let x: usize = g.var("x".into());
         g.add(x, c)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> =
-            HashMap::from([("x".into(), rng.random_range(0.0..100.0))]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x"], 0.0, 100.0);
 }
 // (xy) ^ 2
 #[test]
@@ -79,14 +92,7 @@ fn pow() {
         let xy: usize = g.mul(x, y);
         g.pow(xy, 2.0)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y"], 0.1, 1.0);
 }
 // ln(cos(xy))
 #[test]
@@ -98,14 +104,7 @@ fn ln_cos_xy() {
         let cos_xy: usize = g.cos(xy);
         g.ln(cos_xy)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y"], 0.1, 1.0);
 }
 // cos(sin(cos(exp(x))))
 #[test]
@@ -117,16 +116,11 @@ fn wrapped_trig() {
         let sin_cos_exp_x: usize = g.sin(cos_exp_x);
         g.cos(sin_cos_exp_x)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> =
-            HashMap::from([("x".into(), rng.random_range(0.1..1.0))]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x"], 0.1, 1.0);
 }
-// sin(x) / x^2 + y^2
+// sin(x) / (x^2 + y^2)
 #[test]
-fn fraction(){
+fn fraction() {
     let build = |g: &mut Graph| {
         let x: usize = g.var("x".into());
         let y: usize = g.var("y".into());
@@ -136,19 +130,12 @@ fn fraction(){
         let sin_x: usize = g.sin(x);
         g.div(sin_x, x_sqr_plus_y_sqr)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y"], 0.1, 1.0);
 }
 // -exp(x^2y^3)
 #[test]
-fn neg_exp(){
-    let build = |g: &mut Graph|{
+fn neg_exp() {
+    let build = |g: &mut Graph| {
         let x: usize = g.var("x".into());
         let y: usize = g.var("y".into());
         let x_sqr: usize = g.pow(x, 2.0);
@@ -157,44 +144,29 @@ fn neg_exp(){
         let exp: usize = g.exp(x_sqr_times_y_cube);
         g.neg(exp)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y"], 0.1, 1.0);
 }
 // xyz + sin(xy) + ln(y^2)
 #[test]
-fn triple_var(){
-    let build = |g: &mut Graph|{
+fn triple_var() {
+    let build = |g: &mut Graph| {
         let x: usize = g.var("x".into());
         let y: usize = g.var("y".into());
         let z: usize = g.var("z".into());
         let y_sqr = g.pow(y, 2.0);
         let xy: usize = g.mul(x, y);
-        let xyz: usize = g.mul(xy,z);
+        let xyz: usize = g.mul(xy, z);
         let sin_xy: usize = g.sin(xy);
         let ln_y_sqr: usize = g.ln(y_sqr);
         let xyz_plus_sin_xy: usize = g.add(xyz, sin_xy);
         g.add(xyz_plus_sin_xy, ln_y_sqr)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-            ("z".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y", "z"], 0.1, 1.0);
 }
-// ln(x^2 * y) * sin(exp(xy)) / x^2 + y^2 + z^2
+// ln(x^2 * y) + sin(exp(xy)) + x^2 + y^2 + z^2
 #[test]
-fn crazy(){
-    let build = |g: &mut Graph|{
+fn crazy() {
+    let build = |g: &mut Graph| {
         let x: usize = g.var("x".into());
         let y: usize = g.var("y".into());
         let z: usize = g.var("z".into());
@@ -213,18 +185,10 @@ fn crazy(){
         let x_sqr_plus_y_sqr_plus_z_sqr: usize = g.add(x_sqr_plus_y_sqr, z_sqr);
 
         let ln_plus_sin: usize = g.add(ln_x_sqr_y, sin_exp_xy);
-        
+
         g.add(ln_plus_sin, x_sqr_plus_y_sqr_plus_z_sqr)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-            ("z".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y", "z"], 0.1, 1.0);
 }
 // exp(x) - ln(y)
 #[test]
@@ -236,14 +200,7 @@ fn sub() {
         let ln_y: usize = g.ln(y);
         g.sub(exp_x, ln_y)
     };
-    let mut rng = rand::rng();
-    for _ in 0..10 {
-        let point: HashMap<String, f64> = HashMap::from([
-            ("x".into(), rng.random_range(0.1..1.0)),
-            ("y".into(), rng.random_range(0.1..1.0)),
-        ]);
-        check(build, &point, TOLERANCE);
-    }
+    check_random(build, &["x", "y"], 0.1, 1.0);
 }
 
 // Proves the oracle BITES: if a computed gradient disagrees with the
@@ -260,7 +217,7 @@ fn oracle_catches_wrong_gradient() {
         x * x
     };
     let point: HashMap<String, f64> = HashMap::from([("x".into(), 3.0)]);
-    let num: HashMap<String, f64> = numerical_gradient(f, &point, 1e-5);
+    let num: HashMap<String, f64> = numerical_gradient(f, &point, H);
 
     let wrong: f64 = 0.0; // a broken "derivative" of x^2
     assert!(
