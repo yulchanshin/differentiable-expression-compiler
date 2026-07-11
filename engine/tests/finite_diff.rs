@@ -6,6 +6,7 @@
 //! the location.
 
 use engine::graph::arena::Graph;
+use rand::RngExt;
 use std::collections::HashMap;
 
 fn numerical_gradient(
@@ -50,5 +51,178 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
             auto_diff[key],
             num_grad[key],
         );
+    }
+}
+
+const TOLERANCE: f64 = 1e-6;
+// x + 1
+#[test]
+fn add() {
+    let build = |g: &mut Graph| {
+        let c: usize = g.constant(1.0);
+        let x: usize = g.var("x".into());
+        g.add(x, c)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> =
+            HashMap::from([("x".into(), rng.random_range(0.0..100.0))]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// (xy) ^ 2
+#[test]
+fn pow() {
+    let build = |g: &mut Graph| {
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let xy: usize = g.mul(x, y);
+        g.pow(xy, 2.0)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// ln(cos(xy))
+#[test]
+fn ln_cos_xy() {
+    let build = |g: &mut Graph| {
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let xy: usize = g.mul(x, y);
+        let cos_xy: usize = g.cos(xy);
+        g.ln(cos_xy)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// cos(sin(cos(exp(x))))
+#[test]
+fn wrapped_trig() {
+    let build = |g: &mut Graph| {
+        let x: usize = g.var("x".into());
+        let exp: usize = g.exp(x);
+        let cos_exp_x: usize = g.cos(exp);
+        let sin_cos_exp_x: usize = g.sin(cos_exp_x);
+        g.cos(sin_cos_exp_x)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> =
+            HashMap::from([("x".into(), rng.random_range(0.1..1.0))]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// sin(x) / x^2 + y^2
+#[test]
+fn fraction(){
+    let build = |g: &mut Graph| {
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let x_sqr: usize = g.pow(x, 2.0);
+        let y_sqr: usize = g.pow(y, 2.0);
+        let x_sqr_plus_y_sqr: usize = g.add(x_sqr, y_sqr);
+        let sin_x: usize = g.sin(x);
+        g.div(sin_x, x_sqr_plus_y_sqr)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// -exp(x^2y^3)
+#[test]
+fn neg_exp(){
+    let build = |g: &mut Graph|{
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let x_sqr: usize = g.pow(x, 2.0);
+        let y_cube: usize = g.pow(y, 3.0);
+        let x_sqr_times_y_cube: usize = g.mul(x_sqr, y_cube);
+        let exp: usize = g.exp(x_sqr_times_y_cube);
+        g.neg(exp)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// xyz + sin(xy) + ln(y^2)
+#[test]
+fn triple_var(){
+    let build = |g: &mut Graph|{
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let z: usize = g.var("z".into());
+        let y_sqr = g.pow(y, 2.0);
+        let xy: usize = g.mul(x, y);
+        let xyz: usize = g.mul(xy,z);
+        let sin_xy: usize = g.sin(xy);
+        let ln_y_sqr: usize = g.ln(y_sqr);
+        let xyz_plus_sin_xy: usize = g.add(xyz, sin_xy);
+        g.add(xyz_plus_sin_xy, ln_y_sqr)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+            ("z".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+// ln(x^2 * y) * sin(exp(xy)) / x^2 + y^2 + z^2
+#[test]
+fn crazy(){
+    let build = |g: &mut Graph|{
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let z: usize = g.var("z".into());
+
+        let x_sqr: usize = g.pow(x, 2.0);
+        let y_sqr: usize = g.pow(y, 2.0);
+        let z_sqr: usize = g.pow(z, 2.0);
+
+        let x_sqr_y: usize = g.mul(x_sqr, y);
+        let xy: usize = g.mul(x, y);
+        let exp_xy: usize = g.exp(xy);
+
+        let ln_x_sqr_y: usize = g.ln(x_sqr_y);
+        let sin_exp_xy: usize = g.sin(exp_xy);
+        let x_sqr_plus_y_sqr: usize = g.add(x_sqr, y_sqr);
+        let x_sqr_plus_y_sqr_plus_z_sqr: usize = g.add(x_sqr_plus_y_sqr, z_sqr);
+
+        let ln_plus_sin: usize = g.add(ln_x_sqr_y, sin_exp_xy);
+        
+        g.add(ln_plus_sin, x_sqr_plus_y_sqr_plus_z_sqr)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+            ("z".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
     }
 }
