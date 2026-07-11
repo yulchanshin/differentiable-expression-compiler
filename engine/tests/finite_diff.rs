@@ -9,6 +9,11 @@ use engine::graph::arena::Graph;
 use rand::RngExt;
 use std::collections::HashMap;
 
+/// Estimate the gradient of `f` at `point` by central differences:
+/// `∂f/∂xᵢ ≈ (f(x+h) − f(x−h)) / 2h`, nudging one variable at a time.
+///
+/// This is the numerical oracle: a black box that only ever calls `f`, so
+/// it shares no code with the AD engine and can independently validate it.
 fn numerical_gradient(
     mut f: impl FnMut(&HashMap<String, f64>) -> f64,
     point: &HashMap<String, f64>,
