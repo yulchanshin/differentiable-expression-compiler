@@ -370,17 +370,8 @@ gradient-engine/
 - [X] `TICKET-100` Arena graph representation (`Vec<Node>` + indices)
 - [X] `TICKET-101` `OpType` enum + hand-construction helpers
 - [X] `TICKET-102` Forward evaluation (topological order)
-- [ ] `TICKET-103` Reverse-mode backward pass (the AD core)
-- [ ] `TICKET-104` Finite-difference oracle (validation harness)
-
-### Phase 2 — Extend the math
-- [ ] `TICKET-200` Full op set + local-derivative table + error handling
-- [ ] `TICKET-201` Jacobian (multi-output)
-- [ ] `TICKET-205` Trace emission (frontend contract, serde)
-
-### Phase 3 — Compiler front end (now that Rust + graph are solid)
-- [ ] `TICKET-300` Lexer
-- [ ] `TICKET-301` Pratt parser → AST
+- [X] `TICKET-103` Reverse-mode backward pass (the AD core)
+- [X] `TICKET-104` Finite-difference oracle (validation harness) ### Phase 2 — Extend the math - [ ] `TICKET-200` Full op set + local-derivative table + error handling [ ] `TICKET-201` Jacobian (multi-output) [ ] `TICKET-205` Trace emission (frontend contract, serde) ### Phase 3 — Compiler front end (now that Rust + graph are solid) [ ] `TICKET-300` Lexer [ ] `TICKET-301` Pratt parser → AST
 - [ ] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
@@ -566,10 +557,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - ⚠️ **The Rust challenge:** you're reading one node's adjoint while writing to another node's adjoint, both inside the same `Vec`. The borrow checker will resist `&mut` aliasing. **Solution:** read the values you need into locals first, then write — or index the `Vec` in a split way. This is *the* borrow-checker lesson of the project; when you hit the error, paste it to AI and ask it to *explain the aliasing rule*, then fix it yourself. Don't reach for `RefCell`.
 
 **Acceptance criteria:**
-- [ ] `∇f` for `sin(x*y)+x^2` at `(1.5,2.0)` matches finite differences to 1e-6 (wait for TICKET-104 to automate this; hand-check one value now).
-- [ ] A variable appearing in two terms correctly **sums** both path contributions.
-- [ ] One forward + one backward pass yields the full gradient (no per-input re-run).
-- [ ] You can explain why the borrow-checker error you hit here was correct.
+- [X] `∇f` for `sin(x*y)+x^2` at `(1.5,2.0)` matches finite differences to 1e-6 (wait for TICKET-104 to automate this; hand-check one value now).
+- [X] A variable appearing in two terms correctly **sums** both path contributions.
+- [X] One forward + one backward pass yields the full gradient (no per-input re-run).
+- [X] You can explain why the borrow-checker error you hit here was correct.
 
 🦀 **Rust concepts introduced (Stage E, hard mode):** `&mut` aliasing and how to satisfy the borrow checker when mutating a `Vec` you're also reading (read-into-locals-then-write, or `split_at_mut`); reverse iteration (`.iter().rev()` / reverse index loop); the discipline of accumulation. This is the ticket that makes you *actually understand* Rust ownership.
 
@@ -588,8 +579,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Add a deliberately-broken-derivative test that *should* fail, to prove the oracle bites.
 
 **Acceptance criteria:**
-- [ ] ≥ 8 distinct hand-built expressions pass AD-vs-finite-difference at multiple points.
-- [ ] Breaking one op's derivative makes the harness fail.
+- [X] ≥ 8 distinct hand-built expressions pass AD-vs-finite-difference at multiple points.
+- [X] Breaking one op's derivative makes the harness fail.
 
 🦀 **Rust concepts introduced (Stages F, G):** closures (`impl Fn(...) -> f64`) to pass functions around; `Result`/`Option` in test helpers; `#[test]`, `assert!`, `cargo test`; `rand` crate (add your first external dependency to `Cargo.toml`); generics via `impl Trait` in argument position.
 
