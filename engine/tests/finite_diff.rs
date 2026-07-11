@@ -226,3 +226,47 @@ fn crazy(){
         check(build, &point, TOLERANCE);
     }
 }
+// exp(x) - ln(y)
+#[test]
+fn sub() {
+    let build = |g: &mut Graph| {
+        let x: usize = g.var("x".into());
+        let y: usize = g.var("y".into());
+        let exp_x: usize = g.exp(x);
+        let ln_y: usize = g.ln(y);
+        g.sub(exp_x, ln_y)
+    };
+    let mut rng = rand::rng();
+    for _ in 0..10 {
+        let point: HashMap<String, f64> = HashMap::from([
+            ("x".into(), rng.random_range(0.1..1.0)),
+            ("y".into(), rng.random_range(0.1..1.0)),
+        ]);
+        check(build, &point, TOLERANCE);
+    }
+}
+
+// Proves the oracle BITES: if a computed gradient disagrees with the
+// finite-difference estimate, the comparison must panic. Here f(x) = x^2 has
+// true gradient 2x (= 6 at x=3), but we assert a deliberately wrong value of
+// 0.0 against the numerical estimate. The oracle should reject it. This is
+// the permanent stand-in for "temporarily break a derivative and watch a
+// test fail" — it guarantees the assertion actually fires on mismatch.
+#[test]
+#[should_panic(expected = "grad mismatch")]
+fn oracle_catches_wrong_gradient() {
+    let f = |inputs: &HashMap<String, f64>| {
+        let x: f64 = inputs["x"];
+        x * x
+    };
+    let point: HashMap<String, f64> = HashMap::from([("x".into(), 3.0)]);
+    let num: HashMap<String, f64> = numerical_gradient(f, &point, 1e-5);
+
+    let wrong: f64 = 0.0; // a broken "derivative" of x^2
+    assert!(
+        (wrong - num["x"]).abs() < TOLERANCE,
+        "grad mismatch on x: wrong={}, num={}",
+        wrong,
+        num["x"],
+    );
+}
