@@ -603,8 +603,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Guard `ln(x≤0)`, `div` by 0 with clear errors.
 
 **Acceptance criteria:**
-- [ ] Every §4.3 op has forward + derivative, each finite-difference validated.
-- [ ] Domain errors return a descriptive `EngineError`, not a panic.
+- [X] Every §4.3 op has forward + derivative, each finite-difference validated.
+- [X] Domain errors return a descriptive `EngineError`, not a panic.
 
 🦀 **Rust concepts introduced (Stage F, full):** custom error `enum`; `Result<T, E>` as return type; the `?` operator for propagation; `impl std::error::Error`/`Display` for your error; when to `panic!` (bugs) vs return `Err` (expected failures).
 
