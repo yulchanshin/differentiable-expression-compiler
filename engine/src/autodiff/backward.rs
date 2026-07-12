@@ -173,4 +173,19 @@ mod tests {
 
         assert_eq!(grad["x"], 2.0);
     }
+
+    // sqrt(x) = x^0.5: forward at x = 0 is fine (= 0), but the derivative
+    // 0.5·x^(-0.5) is infinite there. backward must return a DomainError.
+    #[test]
+    fn pow_derivative_at_zero_errors() {
+        let mut g = Graph::new();
+        let x: usize = g.var("x".into());
+        let _p: usize = g.pow(x, 0.5);
+
+        let inputs: HashMap<String, f64> = HashMap::from([("x".to_string(), 0.0)]);
+        g.forward(&inputs).expect("forward should succeed at x = 0");
+        let result = g.backward();
+
+        assert!(matches!(result, Err(EngineError::DomainError(_))));
+    }
 }
