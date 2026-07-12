@@ -37,14 +37,14 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
     //Automatic Differentiation
     let mut g = Graph::new();
     build(&mut g);
-    g.forward(point);
+    g.forward(point).expect("forward should succeed");
     let auto_diff: HashMap<String, f64> = g.backward();
 
     //Numerical Differentiation
     let f = |inputs: &HashMap<String, f64>| {
         let mut gg = Graph::new();
         build(&mut gg);
-        gg.forward(inputs)
+        gg.forward(inputs).expect("forward should succeed")
     };
 
     let num_grad: HashMap<String, f64> = numerical_gradient(f, point, H);

@@ -1,3 +1,4 @@
+use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
 use std::collections::HashMap;
@@ -5,11 +6,13 @@ use std::collections::HashMap;
 // Index order is a valid topological order: builder helpers always push a
 // node's inputs before the node itself, so every input sits at a lower index.
 impl Graph {
-    pub fn forward(&mut self, inputs: &HashMap<String, f64>) -> f64 {
+    pub fn forward(&mut self, inputs: &HashMap<String, f64>) -> Result<f64, EngineError> {
         for i in 0..self.nodes.len() {
             let value = match &self.nodes[i].op {
                 OpType::Const(c) => *c,
-                OpType::Var(name) => inputs[name],
+                OpType::Var(name) => *inputs
+                    .get(name)
+                    .ok_or_else(|| EngineError::UnknownVariable(name.clone()))?,
                 OpType::Add => {
                     let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
                     let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
@@ -23,6 +26,9 @@ impl Graph {
                 OpType::Div => {
                     let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
                     let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
+                    if b == 0.0 {
+                        return Err(EngineError::DivByZero);
+                    }
                     a / b
                 }
                 OpType::Mul => {
@@ -36,6 +42,11 @@ impl Graph {
                 }
                 OpType::Pow(n) => {
                     let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
+                    if a < 0.0 && n.fract() != 0.0 {
+                        return Err(EngineError::DomainError(format!(
+                            "pow with negative base {a} and non-integer exponent {n}"
+                        )));
+                    }
                     a.powf(*n)
                 }
                 OpType::Sin => {
@@ -52,12 +63,17 @@ impl Graph {
                 }
                 OpType::Ln => {
                     let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
+                    if a <= 0.0 {
+                        return Err(EngineError::DomainError(format!(
+                            "ln requires x > 0, but got {a}"
+                        )));
+                    }
                     a.ln()
                 }
             };
             self.nodes[i].value = value;
         }
-        self.nodes[self.nodes.len() - 1].value
+        Ok(self.nodes[self.nodes.len() - 1].value)
     }
 }
 
@@ -81,7 +97,7 @@ mod tests {
         assert!(g.nodes[x_sqr].inputs.contains(&x));
         assert_eq!(g.nodes.len(), 6); // 6 nodes total; x isn't copied       
 
-        let result = g.forward(&inputs);
+        let result = g.forward(&inputs).expect("forward should succeed");
         let expected = (1.5_f64 * 2.0).sin() + 1.5_f64.powi(2); // sin(3.0) + 2.25
 
         assert!((result - expected).abs() < 1e-9);
