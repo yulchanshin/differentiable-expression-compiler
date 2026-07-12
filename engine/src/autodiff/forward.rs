@@ -102,4 +102,56 @@ mod tests {
 
         assert!((result - expected).abs() < 1e-9);
     }
+
+    // A Var whose name is absent from the inputs map must error, not panic.
+    #[test]
+    fn missing_variable_errors() {
+        let mut g = Graph::new();
+        let _x = g.var("x".into());
+
+        let inputs = HashMap::new(); // "x" not provided
+        let result = g.forward(&inputs);
+
+        assert!(matches!(result, Err(EngineError::UnknownVariable(name)) if name == "x"));
+    }
+
+    // div(a, b) with b == 0 must return DivByZero, not silently produce inf.
+    #[test]
+    fn div_by_zero_errors() {
+        let mut g = Graph::new();
+        let x = g.var("x".into());
+        let y = g.var("y".into());
+        let _q = g.div(x, y);
+
+        let inputs = HashMap::from([("x".to_string(), 1.0), ("y".to_string(), 0.0)]);
+        let result = g.forward(&inputs);
+
+        assert!(matches!(result, Err(EngineError::DivByZero)));
+    }
+
+    // ln(x) with x <= 0 must return a DomainError, not silently produce NaN.
+    #[test]
+    fn ln_non_positive_errors() {
+        let mut g = Graph::new();
+        let x = g.var("x".into());
+        let _l = g.ln(x);
+
+        let inputs = HashMap::from([("x".to_string(), -1.0)]);
+        let result = g.forward(&inputs);
+
+        assert!(matches!(result, Err(EngineError::DomainError(_))));
+    }
+
+    // pow(a, k) with a < 0 and non-integer k has no real value → DomainError.
+    #[test]
+    fn pow_negative_base_fractional_errors() {
+        let mut g = Graph::new();
+        let x = g.var("x".into());
+        let _p = g.pow(x, 0.5);
+
+        let inputs = HashMap::from([("x".to_string(), -4.0)]);
+        let result = g.forward(&inputs);
+
+        assert!(matches!(result, Err(EngineError::DomainError(_))));
+    }
 }
