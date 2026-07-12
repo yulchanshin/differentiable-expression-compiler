@@ -133,7 +133,7 @@ mod tests {
 
         let inputs: HashMap<String, f64> =
             HashMap::from([("x".to_string(), 1.5), ("y".to_string(), 2.0)]);
-        g.forward(&inputs);
+        g.forward(&inputs).expect("forward should succeed");
         let grad: HashMap<String, f64> = g.backward();
 
         // ∂f/∂x = y·cos(xy) + 2x   ∂f/∂y = x·cos(xy)
@@ -160,7 +160,7 @@ mod tests {
         let _f: usize = g.add(x, x);
 
         let inputs: HashMap<String, f64> = HashMap::from([("x".to_string(), 3.0)]);
-        g.forward(&inputs);
+        g.forward(&inputs).expect("forward should succeed");
         let grad: HashMap<String, f64> = g.backward();
 
         assert_eq!(grad["x"], 2.0);
