@@ -1,3 +1,4 @@
+use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
 use std::collections::HashMap;
@@ -7,7 +8,7 @@ use std::collections::HashMap;
 // op's local derivative into its inputs' adjoints, accumulating with += so a
 // shared node sums every path. Each var node then holds its partial ∂f/∂var.
 impl Graph {
-    pub fn backward(&mut self) -> HashMap<String, f64> {
+    pub fn backward(&mut self) -> Result<HashMap<String, f64>, EngineError> {
         for node in &mut self.nodes {
             node.adjoint = 0.0;
         }
@@ -73,6 +74,13 @@ impl Graph {
                     // ∂/∂a = k·a^(k−1)  →  ā += ḡ·k·a^(k−1)
                     let a: usize = self.nodes[i].inputs[0];
                     let av: f64 = self.nodes[a].value;
+                    // a^(k−1) blows up at a = 0 when k < 1 (e.g. d/dx √x at 0),
+                    // even though the forward value a^k was finite.
+                    if av == 0.0 && n < 1.0 {
+                        return Err(EngineError::DomainError(format!(
+                            "pow derivative undefined at base 0 with exponent {n} (< 1)"
+                        )));
+                    }
                     self.nodes[a].adjoint += g * n * av.powf(n - 1.0);
                 }
                 OpType::Sin => {
@@ -113,7 +121,7 @@ impl Graph {
                 grad.insert(name.clone(), node.adjoint);
             }
         }
-        grad
+        Ok(grad)
     }
 }
 
@@ -134,7 +142,7 @@ mod tests {
         let inputs: HashMap<String, f64> =
             HashMap::from([("x".to_string(), 1.5), ("y".to_string(), 2.0)]);
         g.forward(&inputs).expect("forward should succeed");
-        let grad: HashMap<String, f64> = g.backward();
+        let grad: HashMap<String, f64> = g.backward().expect("backward should succeed");
 
         // ∂f/∂x = y·cos(xy) + 2x   ∂f/∂y = x·cos(xy)
         // x is a SHARED node (feeds x*y and x^2) so ∂f/∂x sums both paths.
@@ -161,7 +169,7 @@ mod tests {
 
         let inputs: HashMap<String, f64> = HashMap::from([("x".to_string(), 3.0)]);
         g.forward(&inputs).expect("forward should succeed");
-        let grad: HashMap<String, f64> = g.backward();
+        let grad: HashMap<String, f64> = g.backward().expect("backward should succeed");
 
         assert_eq!(grad["x"], 2.0);
     }
