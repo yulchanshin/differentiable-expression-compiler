@@ -8,13 +8,13 @@ use std::collections::HashMap;
 // op's local derivative into its inputs' adjoints, accumulating with += so a
 // shared node sums every path. Each var node then holds its partial ∂f/∂var.
 impl Graph {
-    pub fn backward(&mut self) -> Result<HashMap<String, f64>, EngineError> {
+    pub fn backward(&mut self, output: usize) -> Result<HashMap<String, f64>, EngineError> {
         for node in &mut self.nodes {
             node.adjoint = 0.0;
         }
 
         let len: usize = self.nodes.len();
-        self.nodes[len - 1].adjoint = 1.0;
+        self.nodes[output].adjoint = 1.0;
 
         for i in (0..len).rev() {
             let g: f64 = self.nodes[i].adjoint; // ḡ: this node's accumulated adjoint
@@ -142,7 +142,9 @@ mod tests {
         let inputs: HashMap<String, f64> =
             HashMap::from([("x".to_string(), 1.5), ("y".to_string(), 2.0)]);
         g.forward(&inputs).expect("forward should succeed");
-        let grad: HashMap<String, f64> = g.backward().expect("backward should succeed");
+        let grad: HashMap<String, f64> = g
+            .backward(g.nodes.len() - 1)
+            .expect("backward should succeed");
 
         // ∂f/∂x = y·cos(xy) + 2x   ∂f/∂y = x·cos(xy)
         // x is a SHARED node (feeds x*y and x^2) so ∂f/∂x sums both paths.
@@ -169,7 +171,9 @@ mod tests {
 
         let inputs: HashMap<String, f64> = HashMap::from([("x".to_string(), 3.0)]);
         g.forward(&inputs).expect("forward should succeed");
-        let grad: HashMap<String, f64> = g.backward().expect("backward should succeed");
+        let grad: HashMap<String, f64> = g
+            .backward(g.nodes.len() - 1)
+            .expect("backward should succeed");
 
         assert_eq!(grad["x"], 2.0);
     }
@@ -184,7 +188,7 @@ mod tests {
 
         let inputs: HashMap<String, f64> = HashMap::from([("x".to_string(), 0.0)]);
         g.forward(&inputs).expect("forward should succeed at x = 0");
-        let result = g.backward();
+        let result = g.backward(g.nodes.len() - 1);
 
         assert!(matches!(result, Err(EngineError::DomainError(_))));
     }
