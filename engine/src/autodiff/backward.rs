@@ -1,12 +1,16 @@
+//! Reverse-mode automatic differentiation (the backward pass).
+//!
+//! After a forward pass fills each node's `value`, walk nodes in reverse index
+//! order (a reverse topological order), seed the chosen output's adjoint to 1,
+//! and push each op's local derivative into its inputs' adjoints, accumulating
+//! with `+=` so a shared node sums every path (the sum-over-paths chain rule).
+//! Each variable node then holds its partial `∂f/∂var`.
+
 use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
 use std::collections::HashMap;
 
-// Reverse-mode autodiff: after a forward pass fills each node's value, walk
-// nodes in reverse index order (a reverse topological order) and push each
-// op's local derivative into its inputs' adjoints, accumulating with += so a
-// shared node sums every path. Each var node then holds its partial ∂f/∂var.
 impl Graph {
     pub fn backward(&mut self, output: usize) -> Result<HashMap<String, f64>, EngineError> {
         for node in &mut self.nodes {

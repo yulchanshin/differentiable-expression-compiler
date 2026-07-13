@@ -1,4 +1,4 @@
-//! The `Node` struct and `OpType` enum — the graph's data model.
+//! The `Node` struct and `OpType` enum: the graph's data model.
 
 pub struct Node {
     pub op: OpType,
