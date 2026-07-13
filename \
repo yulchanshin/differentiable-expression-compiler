@@ -242,6 +242,7 @@ fn oracle_catches_wrong_gradient() {
 // polar -> cartesian:  x = r·cosθ,  y = r·sinθ  (two outputs, two vars).
 #[test]
 fn jacobian_rows_match_finite_difference() {
+    // Recipe for the graph; returns the [x, y] output node indices.
     let build = |g: &mut Graph| -> [usize; 2] {
         let r = g.var("r".into());
         let theta = g.var("theta".into());
@@ -252,16 +253,15 @@ fn jacobian_rows_match_finite_difference() {
         [x, y]
     };
 
-    let point: HashMap<String, f64> = HashMap::from([("r".into(), 2.0), ("theta".into(), 0.5)]);
-    let vars: [String; 2] = ["r".to_string(), "theta".to_string()];
+    let point: HashMap<String, f64> =
+        HashMap::from([("r".into(), 2.0), ("theta".into(), 0.5)]);
+    let vars = ["r".to_string(), "theta".to_string()];
 
     // AD Jacobian (one forward, m backward passes).
     let mut g = Graph::new();
     let outputs = build(&mut g);
     g.forward(&point).expect("forward should succeed");
-    let jac = g
-        .jacobian(&outputs, &vars)
-        .expect("jacobian should succeed");
+    let jac = g.jacobian(&outputs, &vars).expect("jacobian should succeed");
 
     // Validate each row against the numerical gradient of that output.
     for (i, _out) in outputs.iter().enumerate() {
