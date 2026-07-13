@@ -1,3 +1,9 @@
+//! Jacobian assembly for vector functions `f: ℝⁿ → ℝᵐ`.
+//!
+//! Runs one backward pass per output (seeding that output's adjoint to 1) to
+//! collect each row `∂fᵢ/∂xⱼ`, reusing a single forward pass across all rows.
+//! See [`Graph::jacobian`] for the full derivation.
+
 use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use std::collections::HashMap;
@@ -16,7 +22,7 @@ impl Graph {
     ///
     /// Reverse-mode AD computes **one row per backward pass**: seeding output
     /// `i`'s adjoint to 1 (all others 0) and propagating backward leaves each
-    /// variable node holding `∂fᵢ/∂xⱼ` — that is row `i`. So we run one forward
+    /// variable node holding `∂fᵢ/∂xⱼ`, i.e. row `i`. So we run one forward
     /// pass (done by the caller, shared across all rows) and `m = outputs.len()`
     /// backward passes, one per output.
     ///

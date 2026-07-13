@@ -1,3 +1,10 @@
+//! Forward evaluation over the arena.
+//!
+//! Fills every node's `value` by iterating the graph in topological order and
+//! `match`ing on `OpType`, reading each node's inputs' already-computed values.
+//! Domain failures (unknown variable, division by zero, `ln`/`pow` domain) are
+//! returned as [`EngineError`] rather than producing `NaN`/`inf` or panicking.
+
 use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
