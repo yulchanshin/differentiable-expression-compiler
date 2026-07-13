@@ -38,7 +38,9 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
     let mut g = Graph::new();
     build(&mut g);
     g.forward(point).expect("forward should succeed");
-    let auto_diff: HashMap<String, f64> = g.backward().expect("backward should succeed");
+    let auto_diff: HashMap<String, f64> = g
+        .backward(g.nodes.len() - 1)
+        .expect("backward should succeed");
 
     //Numerical Differentiation
     let f = |inputs: &HashMap<String, f64>| {
@@ -231,4 +233,54 @@ fn oracle_catches_wrong_gradient() {
         wrong,
         num["x"],
     );
+}
+
+// each Jacobian row must independently match the
+// finite-difference gradient of that output. Each row of J is just the
+// gradient of one scalar output f_i, so the oracle validates it directly.
+//
+// polar -> cartesian:  x = r·cosθ,  y = r·sinθ  (two outputs, two vars).
+#[test]
+fn jacobian_rows_match_finite_difference() {
+    let build = |g: &mut Graph| -> [usize; 2] {
+        let r = g.var("r".into());
+        let theta = g.var("theta".into());
+        let cos_t = g.cos(theta);
+        let sin_t = g.sin(theta);
+        let x = g.mul(r, cos_t);
+        let y = g.mul(r, sin_t);
+        [x, y]
+    };
+
+    let point: HashMap<String, f64> = HashMap::from([("r".into(), 2.0), ("theta".into(), 0.5)]);
+    let vars: [String; 2] = ["r".to_string(), "theta".to_string()];
+
+    // AD Jacobian (one forward, m backward passes).
+    let mut g = Graph::new();
+    let outputs = build(&mut g);
+    g.forward(&point).expect("forward should succeed");
+    let jac = g
+        .jacobian(&outputs, &vars)
+        .expect("jacobian should succeed");
+
+    // Validate each row against the numerical gradient of that output.
+    for (i, _out) in outputs.iter().enumerate() {
+        // f evaluates output i: rebuild, forward, read that node's value.
+        let f = |inputs: &HashMap<String, f64>| {
+            let mut gg = Graph::new();
+            let outs = build(&mut gg);
+            gg.forward(inputs).expect("forward should succeed");
+            gg.nodes[outs[i]].value
+        };
+        let num = numerical_gradient(f, &point, H);
+
+        for (j, v) in vars.iter().enumerate() {
+            assert!(
+                (jac[i][j] - num[v]).abs() < TOLERANCE,
+                "row {i}, var {v}: jac={}, finite-diff={}",
+                jac[i][j],
+                num[v],
+            );
+        }
+    }
 }

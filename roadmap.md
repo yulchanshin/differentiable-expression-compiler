@@ -371,7 +371,17 @@ gradient-engine/
 - [X] `TICKET-101` `OpType` enum + hand-construction helpers
 - [X] `TICKET-102` Forward evaluation (topological order)
 - [X] `TICKET-103` Reverse-mode backward pass (the AD core)
-- [X] `TICKET-104` Finite-difference oracle (validation harness) ### Phase 2 — Extend the math - [ ] `TICKET-200` Full op set + local-derivative table + error handling [ ] `TICKET-201` Jacobian (multi-output) [ ] `TICKET-205` Trace emission (frontend contract, serde) ### Phase 3 — Compiler front end (now that Rust + graph are solid) [ ] `TICKET-300` Lexer [ ] `TICKET-301` Pratt parser → AST
+- [X] `TICKET-104` Finite-difference oracle (validation harness)
+
+### Phase 2 — Extend the math
+- [X] `TICKET-200` Full op set + local-derivative table + error handling
+- [X] `TICKET-201` Jacobian (multi-output)
+- [X] `TICKET-202` Module documentation pass
+- [ ] `TICKET-205` Trace emission (frontend contract, serde)
+
+### Phase 3 — Compiler front end (now that Rust + graph are solid)
+- [ ] `TICKET-300` Lexer
+- [ ] `TICKET-301` Pratt parser → AST
 - [ ] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
@@ -629,6 +639,20 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 🦀 **Rust concepts introduced:** `Vec<Vec<f64>>` nested collections; slices (`&[usize]`, `&[String]`) as function args; iterating with indices to fill a matrix.
 
 **Learn/read:** Jacobian definition (§4.4); why reverse mode = one row per pass.
+
+---
+
+#### TICKET-202 — Module documentation pass
+
+**Description:** Backfill `//!` module-level doc comments on the source files touched during Phase 1–2 (autodiff, graph, error, ops), so each module explains its purpose and how it fits the engine.
+
+**Detail:**
+- Add a `//!` header to each modified file (e.g. `forward.rs`, `backward.rs`, `error.rs`, `node.rs`, `arena.rs`, and any ops/derivatives files) describing what it does and its role.
+- Replace the leftover `//! description incoming` stubs (e.g. `topo.rs`, `derivatives.rs`) with real summaries.
+
+**Acceptance criteria:**
+- [ ] Every source file modified in Phases 1–2 has a meaningful `//!` module doc.
+- [ ] No `description incoming` placeholders remain.
 
 ---
 
