@@ -38,7 +38,9 @@ fn check(build: impl Fn(&mut Graph) -> usize, point: &HashMap<String, f64>, tole
     let mut g = Graph::new();
     build(&mut g);
     g.forward(point).expect("forward should succeed");
-    let auto_diff: HashMap<String, f64> = g.backward().expect("backward should succeed");
+    let auto_diff: HashMap<String, f64> = g
+        .backward(g.nodes.len() - 1)
+        .expect("backward should succeed");
 
     //Numerical Differentiation
     let f = |inputs: &HashMap<String, f64>| {
