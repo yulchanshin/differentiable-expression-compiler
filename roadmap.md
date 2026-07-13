@@ -389,6 +389,10 @@ gradient-engine/
 - [ ] `TICKET-401` Common-subexpression elimination
 - [ ] `TICKET-402` Dead-node elimination + node-count benchmark
 
+### Phase 4.5 — Symbolic differentiation (the contrast piece)
+- [ ] `TICKET-450` Symbolic diff (graph → graph) + expression-swell demo
+- [ ] `TICKET-451` Higher-order derivatives (f″, Hessian) via repeated symbolic diff
+
 ### Phase 5 — Solvers
 - [ ] `TICKET-500` LU linear solver
 - [ ] `TICKET-501` Newton's method
@@ -797,6 +801,62 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 🦀 **Rust concepts introduced:** graph traversal (reachability) over the arena; `Vec<bool>` mark sets; index renumbering with a remap table.
 
 **Learn/read:** reachability-based DCE; presenting optimization wins quantitatively.
+
+---
+
+### PHASE 4.5 — Symbolic differentiation (the contrast piece)
+
+> §4.1 frames the three-way contrast — **symbolic** (formulas → formulas, exact but explodes), **numerical** (finite differences, approximate), and **automatic** (chain rule over the graph, exact at ~one eval's cost). You've built the automatic one and validated it against the numerical one. This short phase builds the **symbolic** one too — not because you need it, but because *building it is how you actually feel the "expressions blow up" claim* instead of taking it on faith. The payoff is a three-way agreement check (symbolic ≡ finite-diff ≡ reverse-mode adjoint at random points) and a firsthand look at expression swell — followed by the punchline that your Phase 4 optimizer is exactly the tool that fights it, and that even so, reverse-mode still wins for many-input gradients. Self-contained; needs the parser (Phase 3) and leans on the optimizer (Phase 4), but nothing downstream depends on it. Pure bonus, and great interview material for "explain the difference between symbolic and automatic differentiation."
+
+---
+
+#### TICKET-450 — Symbolic diff (graph → graph) + expression-swell demo
+**Branch:** `feat/450-symbolic-diff`
+
+**Description:** Implement classic symbolic differentiation as a **graph-to-graph transform**: given an expression's root node and a variable, recursively *build a new subgraph* representing the derivative expression, using the textbook rules (sum, product, quotient, chain). Then measure the thing everyone warns about — the derivative graph growing far larger than the original — and show your optimizer clawing it back.
+
+**Detail:**
+- `fn diff(&mut self, node: usize, wrt: &str) -> usize`: recurse on the node's `OpType`, **pushing new nodes** onto the arena and returning the index of the derivative expression's root. The rules (each expressed as more graph, reusing existing `OpType`s):
+  - `Var(v)` → `Const(1.0)` if `v == wrt` else `Const(0.0)`; `Const(_)` → `Const(0.0)`.
+  - `Add(a,b)` → `add(diff a, diff b)`; `Sub(a,b)` → `sub(diff a, diff b)`; `Neg(a)` → `neg(diff a)`.
+  - `Mul(a,b)` → **product rule** `add(mul(diff a, b), mul(a, diff b))`.
+  - `Div(a,b)` → **quotient rule** `div(sub(mul(diff a, b), mul(a, diff b)), pow(b, 2))`.
+  - `Pow(a,k)` → **power + chain** `mul(mul(Const k, pow(a, k−1)), diff a)`.
+  - `Sin(a)`→`mul(cos(a), diff a)`; `Cos(a)`→`mul(neg(sin(a)), diff a)`; `Exp(a)`→`mul(exp(a), diff a)`; `Ln(a)`→`mul(div(Const 1, a), diff a)`. (Each is the **chain rule**: outer local derivative × `diff` of the inner.)
+- **Measure the swell:** take a nested expression (e.g. a product/chain a few levels deep), record the original node count, then the raw `diff` output's node count — it should be conspicuously larger (unsimplified product rule duplicates subtrees). `diff` a *second* time and watch it balloon again (motivates TICKET-451).
+- **Then fight it:** run the Phase 4 pipeline (const-fold + CSE + DCE) on the symbolic derivative and record the post-optimization node count. Const-folding kills the `*1`/`+0`/`Const` arithmetic the naive rules spray everywhere; CSE re-shares the duplicated subtrees. Log raw-vs-optimized to `bench/results/` alongside the TICKET-402 numbers.
+- **The punchline (write it as a comment/README note):** even optimized, symbolic diff needs **one `diff` pass per input variable** to get a full gradient (n passes for n inputs), whereas reverse-mode gets the whole gradient in **one** backward pass. That asymmetry — not correctness — is *why* AD exists.
+
+**Acceptance criteria:**
+- [ ] `diff` produces a derivative graph whose forward-evaluation matches the reverse-mode adjoint **and** the finite-difference oracle at several random points (three-way agreement) for ≥ 6 expressions.
+- [ ] Node-count table recorded: original vs raw-derivative vs optimized-derivative, showing the swell and the optimizer's reduction.
+- [ ] A short written note (comment or README) states why reverse-mode still beats symbolic for many-input gradients.
+
+🦀 **Rust concepts introduced:** recursion that **mutates the arena while returning a fresh index** (watch the borrow checker — compute child indices into locals *before* the `push` that consumes them, same lesson as TICKET-103); `match` on `OpType` dispatching to per-op rules; reusing the TICKET-101 builder helpers as the "constructors" of the derivative graph; composing existing passes as a library.
+
+**Learn/read:** any calculus refresher on the product/quotient/chain rules; "symbolic differentiation expression swell" (why unsimplified symbolic diff is exponential); revisit §4.1 with the contrast now concrete.
+
+---
+
+#### TICKET-451 — Higher-order derivatives (f″, Hessian) via repeated symbolic diff
+**Branch:** `feat/451-higher-order`
+
+**Description:** The clean bonus symbolic diff hands you almost for free: because `diff` returns *another expression graph*, you can differentiate the result again. Compute second derivatives and a Hessian by composing `diff` with itself — something reverse-mode doesn't give you directly.
+
+**Detail:**
+- `f″` for a single-variable expression is just `diff(diff(f, "x"), "x")` — evaluate it and check against a second-order finite difference `(f(x+h) − 2f(x) + f(x−h)) / h²`.
+- **Hessian** for `f: ℝⁿ → ℝ`: `H[i][j] = ∂²f/∂xᵢ∂xⱼ = diff(diff(f, xᵢ), xⱼ)`. Build the n×n grid of derivative graphs, evaluate at a point, assert symmetry (`H[i][j] == H[j][i]` to tolerance) and agreement with finite differences.
+- **Always optimize between rounds:** without a const-fold/CSE pass, the second `diff` explodes on the *already-swollen* first derivative (this is the TICKET-450 swell, squared). Run the pass on the first derivative before differentiating again, and note the node-count difference with vs without the intermediate simplification.
+- Keep it modest: a 2–3 variable Hessian is plenty to demonstrate the idea and gives you a real matrix a future Newton step could consume.
+
+**Acceptance criteria:**
+- [ ] `f″` matches a second-order finite difference to tolerance for ≥ 3 single-variable expressions.
+- [ ] A 2×2 (or 3×3) Hessian is symmetric and matches finite differences at random points.
+- [ ] Node-count note shows why simplifying between differentiation rounds matters.
+
+🦀 **Rust concepts introduced:** composing a transform with itself (`diff` over `diff`'s output); building a `Vec<Vec<usize>>` grid of derivative roots; nested iteration to fill a matrix; reusing the optimizer as a *necessary* intermediate step rather than a final polish.
+
+**Learn/read:** second-order central differences; the Hessian's symmetry (Clairaut/Schwarz theorem); why naive higher-order symbolic diff is the canonical expression-swell blowup.
 
 ---
 
