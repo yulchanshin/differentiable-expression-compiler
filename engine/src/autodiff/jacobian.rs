@@ -29,8 +29,8 @@ impl Graph {
     /// `outputs[i]` is the node index of `fᵢ` (fixing row order); `vars[j]` is
     /// the name of `xⱼ` (fixing column order, since the gradient map is
     /// unordered). Assumes [`forward`](Self::forward) has already populated node
-    /// values. Returns the dense m×n matrix, or the first `EngineError` a
-    /// backward pass raises.
+    /// values. Returns the dense m×n matrix, or an `EngineError` (a requested
+    /// variable missing from the graph, or one raised by a backward pass).
     pub fn jacobian(
         &mut self,
         outputs: &[usize],
@@ -39,7 +39,16 @@ impl Graph {
         let mut jac: Vec<Vec<f64>> = Vec::new();
         for &output in outputs {
             let grad: HashMap<String, f64> = self.backward(output)?;
-            let row: Vec<f64> = vars.iter().map(|v| grad[v]).collect();
+            // A requested var that isn't in the graph errors rather than panics,
+            // matching forward's UnknownVariable handling.
+            let row: Vec<f64> = vars
+                .iter()
+                .map(|v| {
+                    grad.get(v)
+                        .copied()
+                        .ok_or_else(|| EngineError::UnknownVariable(v.clone()))
+                })
+                .collect::<Result<Vec<f64>, EngineError>>()?;
             jac.push(row);
         }
         Ok(jac)

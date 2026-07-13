@@ -371,7 +371,17 @@ gradient-engine/
 - [X] `TICKET-101` `OpType` enum + hand-construction helpers
 - [X] `TICKET-102` Forward evaluation (topological order)
 - [X] `TICKET-103` Reverse-mode backward pass (the AD core)
-- [X] `TICKET-104` Finite-difference oracle (validation harness) ### Phase 2 — Extend the math - [ ] `TICKET-200` Full op set + local-derivative table + error handling [ ] `TICKET-201` Jacobian (multi-output) [ ] `TICKET-202` Module documentation pass [ ] `TICKET-205` Trace emission (frontend contract, serde) ### Phase 3 — Compiler front end (now that Rust + graph are solid) [ ] `TICKET-300` Lexer [ ] `TICKET-301` Pratt parser → AST
+- [X] `TICKET-104` Finite-difference oracle (validation harness)
+
+### Phase 2 — Extend the math
+- [X] `TICKET-200` Full op set + local-derivative table + error handling
+- [X] `TICKET-201` Jacobian (multi-output)
+- [X] `TICKET-202` Module documentation pass
+- [ ] `TICKET-205` Trace emission (frontend contract, serde)
+
+### Phase 3 — Compiler front end (now that Rust + graph are solid)
+- [ ] `TICKET-300` Lexer
+- [ ] `TICKET-301` Pratt parser → AST
 - [ ] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
