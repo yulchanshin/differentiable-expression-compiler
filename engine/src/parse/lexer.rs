@@ -1,4 +1,3 @@
-//lexer.rs
 //! Lexer: turns source text like `sin(x*y) + x^2` into a `Token` stream.
 use crate::error::EngineError;
 use std::iter::Peekable;
@@ -111,16 +110,162 @@ impl<'a> Lexer<'a> {
     /// Consume a run of digits (with an optional decimal point) into a
     /// `Number`. Called only when the next char is a digit or '.'.
     fn read_number(&mut self) -> Result<Token, EngineError> {
-        todo!("loop while peek() is a digit or '.', parse::<f64>(), return Token::Number")
         let mut num: String = String::new();
-        while let Some(&n) = self.chars.peek(){
+        while let Some(&n) = self.chars.peek() {
             if n.is_ascii_digit() || n == '.' {
                 num.push(n);
                 self.chars.next();
             } else {
                 break;
             }
-
         }
-        Ok(Token::Number(num.parse().unwrap())) }
+        // The loop over-accepts (e.g. "1.2.3"), so parse() is the validation
+        // gate: a bad run becomes an Err instead of a panic.
+        num.parse::<f64>()
+            .map(Token::Number)
+            .map_err(|_| EngineError::InvalidNumber(num))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Drive `next_token` to exhaustion, returning the full token stream
+    /// (with the trailing `Eof`) or the first error the lexer hits.
+    fn lex_all(src: &str) -> Result<Vec<Token>, EngineError> {
+        let mut lexer = Lexer::new(src);
+        let mut tokens = Vec::new();
+        loop {
+            let tok = lexer.next_token()?;
+            let done = tok == Token::Eof;
+            tokens.push(tok);
+            if done {
+                return Ok(tokens);
+            }
+        }
+    }
+
+    // The canonical expression from the roadmap: 10 content tokens + Eof.
+    #[test]
+    fn lexes_sin_xy_plus_x2() {
+        let tokens = lex_all("sin(x*y) + x^2").expect("should lex cleanly");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Ident("sin".into()),
+                Token::LParen,
+                Token::Ident("x".into()),
+                Token::Star,
+                Token::Ident("y".into()),
+                Token::RParen,
+                Token::Plus,
+                Token::Ident("x".into()),
+                Token::Caret,
+                Token::Number(2.0),
+                Token::Eof,
+            ]
+        );
+    }
+
+    // Each single-char operator and delimiter maps to its own token.
+    #[test]
+    fn lexes_all_operators() {
+        assert_eq!(
+            lex_all("+-*/^(),").unwrap(),
+            vec![
+                Token::Plus,
+                Token::Minus,
+                Token::Star,
+                Token::Slash,
+                Token::Caret,
+                Token::LParen,
+                Token::RParen,
+                Token::Comma,
+                Token::Eof,
+            ]
+        );
+    }
+
+    // Multi-digit integers and decimals both parse to one Number each.
+    #[test]
+    fn lexes_multidigit_and_float_numbers() {
+        assert_eq!(
+            lex_all("42").unwrap(),
+            vec![Token::Number(42.0), Token::Eof]
+        );
+        assert_eq!(
+            lex_all("3.14").unwrap(),
+            vec![Token::Number(3.14), Token::Eof]
+        );
+        assert_eq!(
+            lex_all("10 + 2.5").unwrap(),
+            vec![
+                Token::Number(10.0),
+                Token::Plus,
+                Token::Number(2.5),
+                Token::Eof,
+            ]
+        );
+    }
+
+    // An identifier is a letter followed by any run of alphanumerics, so a
+    // trailing digit stays part of the same Ident (theta2, not theta then 2).
+    #[test]
+    fn identifier_allows_trailing_digits() {
+        assert_eq!(
+            lex_all("theta2").unwrap(),
+            vec![Token::Ident("theta2".into()), Token::Eof]
+        );
+    }
+
+    #[test]
+    fn lexes_nested_parens() {
+        assert_eq!(
+            lex_all("((x))").unwrap(),
+            vec![
+                Token::LParen,
+                Token::LParen,
+                Token::Ident("x".into()),
+                Token::RParen,
+                Token::RParen,
+                Token::Eof,
+            ]
+        );
+    }
+
+    // Whitespace (spaces and tabs; leading, trailing, and interior) is skipped.
+    #[test]
+    fn skips_whitespace_between_tokens() {
+        assert_eq!(
+            lex_all("  x   +\ty ").unwrap(),
+            vec![
+                Token::Ident("x".into()),
+                Token::Plus,
+                Token::Ident("y".into()),
+                Token::Eof,
+            ]
+        );
+    }
+
+    // Empty (or all-whitespace) input is just Eof.
+    #[test]
+    fn empty_input_is_just_eof() {
+        assert_eq!(lex_all("").unwrap(), vec![Token::Eof]);
+        assert_eq!(lex_all("   ").unwrap(), vec![Token::Eof]);
+    }
+
+    // Error case 1: a char that can't start any token.
+    #[test]
+    fn unexpected_char_errors() {
+        let err = lex_all("x @ y").unwrap_err();
+        assert!(matches!(err, EngineError::UnexpectedChar('@')));
+    }
+
+    // Error case 2: a numeric run that doesn't parse as f64.
+    #[test]
+    fn malformed_number_errors() {
+        let err = lex_all("1.2.3").unwrap_err();
+        assert!(matches!(err, EngineError::InvalidNumber(_)));
+    }
 }
