@@ -8,6 +8,7 @@
 
 use crate::parse::lexer::Token;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Num(f64),
     Var(String),

@@ -13,4 +13,8 @@ pub enum EngineError {
     DomainError(String),     // ln(x<=0), pow(neg, fractional), etc.; message says which
     UnexpectedChar(char),    // lexer hit a char that can't start any token
     InvalidNumber(String),   // a numeric run that doesn't parse as f64, e.g. "1.2.3"
+    UnexpectedToken {        // parser saw a token the grammar doesn't allow here
+        expected: String,    // human description of what was wanted, e.g. "`)`"
+        found: String,       // the token actually seen, e.g. "Eof"
+    },
 }
