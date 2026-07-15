@@ -17,6 +17,11 @@ pub struct Parser {
 }
 
 impl Parser {
+    pub fn parse(&mut self) -> Result<Expr, EngineError> {
+        let expr = self.parse_expr(0)?;
+        self.expect(Token::Eof)?; // nothing may follow the expression
+        Ok(expr)
+    }
     /// Build a parser over an already-lexed token stream. Expects the trailing
     /// `Eof` from `Lexer::tokenize` to be present, which is what lets `peek`
     /// stay in bounds once the real tokens run out. The cursor starts at 0.
@@ -60,11 +65,24 @@ impl Parser {
     /// an expression on its own. `advance` up front hands us an owned `Token`,
     /// which ends the borrow of `self` so the arms are free to call back into
     /// `parse_expr`/`expect`, and gives the leaf arms owned values with no
-    /// clone. Prefix `-` and function calls are not handled yet.
+    /// clone. Handles numbers, variables, function calls, parenthesized
+    /// groups, and prefix `-`.
     pub fn parse_atom(&mut self) -> Result<Expr, EngineError> {
         match self.advance() {
             Token::Number(n) => Ok(Expr::Num(n)),
-            Token::Ident(name) => Ok(Expr::Var(name)),
+            Token::Ident(name) => {
+                if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    let arg: Expr = self.parse_expr(0)?;
+                    self.expect(Token::RParen)?;
+                    Ok(Expr::Call {
+                        fn_name: name,
+                        arg: Box::new(arg),
+                    })
+                } else {
+                    Ok(Expr::Var(name))
+                }
+            }
             // `(` resets precedence: parse a fresh expression, then require the
             // matching `)`. The parens leave no node; we return the inner tree.
             Token::LParen => {
@@ -72,6 +90,10 @@ impl Parser {
                 self.expect(Token::RParen)?;
                 Ok(inner)
             }
+            Token::Minus => Ok(Expr::Unary {
+                op: Token::Minus,
+                child: Box::new(self.parse_expr(5)?),
+            }),
             other => Err(EngineError::UnexpectedToken {
                 expected: "a number, variable, or '('".into(),
                 found: format!("{other:?}"),
@@ -139,11 +161,18 @@ fn infix_binding_power(tok: &Token) -> Option<(u8, u8)> {
 mod tests {
     use super::*;
 
-    /// Lex then parse a full expression, unwrapping both steps. Used by the
-    /// success cases below, which all pass valid source.
+    /// Lex then fully parse a valid expression (through `parse`, so the
+    /// trailing-`Eof` check runs too), unwrapping both steps.
     fn parse(src: &str) -> Expr {
         let tokens = crate::parse::lexer::Lexer::new(src).tokenize().unwrap();
-        Parser::new(tokens).parse_expr(0).unwrap()
+        Parser::new(tokens).parse().unwrap()
+    }
+
+    /// Lex then parse source expected to be invalid, returning the error so a
+    /// test can assert on its kind. Panics if the input unexpectedly parses.
+    fn parse_err(src: &str) -> EngineError {
+        let tokens = crate::parse::lexer::Lexer::new(src).tokenize().unwrap();
+        Parser::new(tokens).parse().unwrap_err()
     }
 
     // Small tree builders so the expected ASTs read close to the source.
@@ -158,6 +187,18 @@ mod tests {
             op,
             left: Box::new(left),
             right: Box::new(right),
+        }
+    }
+    fn unary(op: Token, child: Expr) -> Expr {
+        Expr::Unary {
+            op,
+            child: Box::new(child),
+        }
+    }
+    fn call(fn_name: &str, arg: Expr) -> Expr {
+        Expr::Call {
+            fn_name: fn_name.into(),
+            arg: Box::new(arg),
         }
     }
 
@@ -203,5 +244,62 @@ mod tests {
             parse("(a+b)*c"),
             bin(Token::Star, bin(Token::Plus, var("a"), var("b")), var("c")),
         );
+    }
+
+    // Prefix `-` binds looser than `^`: -x^2 parses as -(x^2), not (-x)^2.
+    #[test]
+    fn prefix_minus_binds_looser_than_caret() {
+        assert_eq!(
+            parse("-x^2"),
+            unary(Token::Minus, bin(Token::Caret, var("x"), num(2.0))),
+        );
+    }
+
+    // A function call wraps a parenthesized argument expression.
+    #[test]
+    fn call_parses_name_and_argument() {
+        assert_eq!(
+            parse("sin(x*y)"),
+            call("sin", bin(Token::Star, var("x"), var("y"))),
+        );
+    }
+
+    // Error case 1: a `(` group that is never closed. The inner parse_expr
+    // stops on Eof, so expect(RParen) fails instead of running off the end.
+    #[test]
+    fn unclosed_paren_errors() {
+        assert!(matches!(
+            parse_err("(a+b"),
+            EngineError::UnexpectedToken { .. }
+        ));
+    }
+
+    // Error case 2: trailing tokens after a complete expression. parse_expr
+    // returns `1`, then parse's expect(Eof) rejects the leftover `2`.
+    #[test]
+    fn trailing_tokens_error() {
+        assert!(matches!(
+            parse_err("1 2"),
+            EngineError::UnexpectedToken { .. }
+        ));
+    }
+
+    // Error case 3: an operator with no right operand. parse_atom is asked for
+    // a primary but finds Eof, which can't start an expression.
+    #[test]
+    fn missing_operand_errors() {
+        assert!(matches!(
+            parse_err("a *"),
+            EngineError::UnexpectedToken { .. }
+        ));
+    }
+
+    // Error case 4: a token that cannot begin an expression at all.
+    #[test]
+    fn expression_cannot_start_with_rparen() {
+        assert!(matches!(
+            parse_err(")"),
+            EngineError::UnexpectedToken { .. }
+        ));
     }
 }
