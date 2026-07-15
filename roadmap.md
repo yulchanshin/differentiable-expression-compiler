@@ -377,11 +377,11 @@ gradient-engine/
 - [X] `TICKET-200` Full op set + local-derivative table + error handling
 - [X] `TICKET-201` Jacobian (multi-output)
 - [X] `TICKET-202` Module documentation pass
-- [ ] `TICKET-205` Trace emission (frontend contract, serde)
+- [X] `TICKET-205` Trace emission (frontend contract, serde)
 
 ### Phase 3 — Compiler front end (now that Rust + graph are solid)
-- [ ] `TICKET-300` Lexer
-- [ ] `TICKET-301` Pratt parser → AST
+- [X] `TICKET-300` Lexer
+- [X] `TICKET-301` Pratt parser → AST
 - [ ] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
@@ -637,8 +637,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Return a dense `Vec<Vec<f64>>` (m rows × n cols).
 
 **Acceptance criteria:**
-- [ ] Jacobian of a known 2→2 map (e.g. polar→cartesian) matches the analytic Jacobian to 1e-6.
-- [ ] Each row independently finite-difference validated.
+- [X] Jacobian of a known 2→2 map (e.g. polar→cartesian) matches the analytic Jacobian to 1e-6.
+- [X] Each row independently finite-difference validated.
 
 🦀 **Rust concepts introduced:** `Vec<Vec<f64>>` nested collections; slices (`&[usize]`, `&[String]`) as function args; iterating with indices to fill a matrix.
 
@@ -655,8 +655,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Replace the leftover `//! description incoming` stubs (e.g. `topo.rs`, `derivatives.rs`) with real summaries.
 
 **Acceptance criteria:**
-- [ ] Every source file modified in Phases 1–2 has a meaningful `//!` module doc.
-- [ ] No `description incoming` placeholders remain.
+- [X] Every source file modified in Phases 1–2 has a meaningful `//!` module doc.
+- [X] No `description incoming` placeholders remain.
 
 ---
 
@@ -671,9 +671,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - A golden-file test pinning the trace JSON for `sin(x*y)+x^2` at a fixed point.
 
 **Acceptance criteria:**
-- [ ] `serde_json::to_string(&trace)` produces JSON matching §7.3.
-- [ ] `forward.len() == node_count`; `backward` is exactly the reverse order.
-- [ ] Golden-file test passes.
+- [X] `serde_json::to_string(&trace)` produces JSON matching §7.3.
+- [X] `forward.len() == node_count`; `backward` is exactly the reverse order.
+- [X] Golden-file test passes.
 
 🦀 **Rust concepts introduced (Stage K):** `serde` + `serde_json`; `#[derive(Serialize)]`; adding and using ecosystem crates; struct-to-JSON mapping; golden-file testing.
 
@@ -698,8 +698,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Handle floats, whitespace-skipping, and a clear error with position on an unexpected char.
 
 **Acceptance criteria:**
-- [ ] Lexing `sin(x*y) + x^2` yields the expected 11 tokens + `Eof`.
-- [ ] Tests cover multi-digit floats, all operators, nested parens, one error case.
+- [X] Lexing `sin(x*y) + x^2` yields the expected 11 tokens + `Eof`.
+- [X] Tests cover multi-digit floats, all operators, nested parens, one error case.
 
 🦀 **Rust concepts introduced:** `char` handling; `Peekable` iterators (`.peek()`, `.next()`); `String` building; `Result`-returning iteration; the `chars()` iterator. Lexing is beginner-friendly Rust — a good confidence rebuild after Phase 1.
 
@@ -718,10 +718,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Descriptive syntax errors (unexpected token, unclosed paren).
 
 **Acceptance criteria:**
-- [ ] `x^2^3` parses right-associatively as `x^(2^3)`.
-- [ ] `-x^2` parses as `-(x^2)`.
-- [ ] `a + b*c` groups the multiply first.
-- [ ] ≥ 3 error cases return descriptive errors, not panics.
+- [X] `x^2^3` parses right-associatively as `x^(2^3)`.
+- [X] `-x^2` parses as `-(x^2)`.
+- [X] `a + b*c` groups the multiply first.
+- [X] ≥ 3 error cases return descriptive errors, not panics.
 
 🦀 **Rust concepts introduced (Stages H, I):** `Box<T>` for recursive enums (**the key lesson here** — why the AST *needs* `Box`); recursive functions over an owned tree; single-ownership on a tree (contrast with the arena you needed for the graph — a great thing to articulate: *tree = ownership easy, graph = ownership hard, hence arena*); more `match`.
 
