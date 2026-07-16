@@ -87,12 +87,6 @@ pub struct Lowerer {
 }
 
 impl Lowerer {
-    pub fn new() -> Self {
-        Lowerer {
-            memo: HashMap::new(),
-        }
-    }
-
     pub fn lower(&mut self, expr: &Expr, graph: &mut Graph) -> Result<usize, EngineError> {
         match expr {
             Expr::Num(n) => Ok(self.intern(graph, OpType::Const(*n), vec![])),
@@ -145,7 +139,6 @@ impl Lowerer {
                 };
                 Ok(self.intern(graph, optype, vec![child_node]))
             }
-            // TODO(you): match fn_name ("sin"/"cos"/"exp"/"ln"), error otherwise.
             Expr::Call { fn_name, arg } => {
                 let child_node: usize = self.lower(arg, graph)?;
                 let optype = match fn_name.as_str() {
@@ -180,5 +173,70 @@ impl Lowerer {
         });
         self.memo.insert(key, idx);
         idx
+    }
+}
+
+/// Lower a whole expression tree into a fresh graph.
+///
+/// Returns the graph and the index of its root (output) node. Callers use
+/// this instead of driving a [`Lowerer`] themselves, so the memo table stays
+/// an internal detail. Because interning pushes each node after its inputs,
+/// index order is a valid topological order and the root is the last node.
+pub fn lower(expr: &Expr) -> Result<(Graph, usize), EngineError> {
+    let mut graph = Graph::new();
+    let root = Lowerer::default().lower(expr, &mut graph)?;
+    Ok((graph, root))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse::compile;
+    use std::collections::HashMap;
+
+    #[test]
+    fn shared_subexpression_is_one_node() {
+        // x*y + x*y: hash-consing must collapse the repeated product so the
+        // graph is exactly {x, y, x*y, +} -- four nodes, not seven.
+        let (g, root) = compile("x*y + x*y").unwrap();
+        assert_eq!(g.nodes.len(), 4);
+
+        // The root Add's two inputs are the *same* x*y node.
+        let inputs = &g.nodes[root].inputs;
+        assert_eq!(inputs[0], inputs[1]);
+    }
+
+    #[test]
+    fn repeated_variable_is_one_node() {
+        // x appears twice (in x*y and x^2) but must be a single shared node.
+        let (g, _) = compile("sin(x*y) + x^2").unwrap();
+        let x_nodes = g
+            .nodes
+            .iter()
+            .filter(|n| matches!(&n.op, OpType::Var(name) if name == "x"))
+            .count();
+        assert_eq!(x_nodes, 1);
+    }
+
+    #[test]
+    fn matches_hand_built_graph() {
+        // Acceptance criterion: parsing + lowering sin(x*y)+x^2 produces the
+        // same graph (node count and forward value) as the hand-built version
+        // from the forward-pass tests.
+        let (mut g, _) = compile("sin(x*y) + x^2").unwrap();
+        assert_eq!(g.nodes.len(), 6); // x, y, x*y, sin, x^2, +
+
+        let inputs = HashMap::from([("x".to_string(), 1.5), ("y".to_string(), 2.0)]);
+        let result = g.forward(&inputs).expect("forward should succeed");
+        let expected = (1.5_f64 * 2.0).sin() + 1.5_f64.powi(2);
+        assert!((result - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unknown_function_is_an_error() {
+        assert!(matches!(
+            compile("sqrt(x)"),
+            Err(EngineError::UnexpectedToken { .. })
+        ));
     }
 }
