@@ -382,7 +382,7 @@ gradient-engine/
 ### Phase 3 — Compiler front end (now that Rust + graph are solid)
 - [X] `TICKET-300` Lexer
 - [X] `TICKET-301` Pratt parser → AST
-- [ ] `TICKET-302` AST → graph lowering (hash-consing)
+- [X] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
 - [ ] `TICKET-400` Constant folding
@@ -740,8 +740,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - Map variable names to their (deduped) var-node indices.
 
 **Acceptance criteria:**
-- [ ] `x*y + x*y` lowers to a graph where `x*y` is a single shared node (assert node count).
-- [ ] Parsing + lowering `sin(x*y)+x^2` produces a graph whose forward/backward match the hand-built version from Phase 1 exactly.
+- [X] `x*y + x*y` lowers to a graph where `x*y` is a single shared node (assert node count).
+- [X] Parsing + lowering `sin(x*y)+x^2` produces a graph whose forward/backward match the hand-built version from Phase 1 exactly.
 
 🦀 **Rust concepts introduced (Stage J):** `HashMap` with a custom key (deriving `Hash`, `Eq`, `PartialEq` on a key struct/enum); recursion returning indices; bridging the tree (AST) and the arena (graph) — a concrete lesson in *why* the two data structures use different ownership strategies.
 
