@@ -22,7 +22,11 @@
 
 use std::collections::HashMap;
 
-use crate::graph::node::OpType;
+use crate::error::EngineError;
+use crate::graph::arena::Graph;
+use crate::graph::node::{Node, OpType};
+use crate::parse::ast::Expr;
+use crate::parse::lexer::Token;
 
 /// The op portion of a [`NodeKey`], with every `f64` payload replaced by its
 /// `to_bits()` representation so the whole thing can derive `Eq` + `Hash`.
@@ -73,7 +77,108 @@ impl NodeKey {
         }
     }
 }
-
 /// Memo table for hash-consing: maps a node's structural key to the index of
 /// the single node that realizes it.
 type Memo = HashMap<NodeKey, usize>;
+
+#[derive(Default)]
+pub struct Lowerer {
+    memo: Memo,
+}
+
+impl Lowerer {
+    pub fn new() -> Self {
+        Lowerer {
+            memo: HashMap::new(),
+        }
+    }
+
+    pub fn lower(&mut self, expr: &Expr, graph: &mut Graph) -> Result<usize, EngineError> {
+        match expr {
+            Expr::Num(n) => Ok(self.intern(graph, OpType::Const(*n), vec![])),
+            Expr::Var(name) => Ok(self.intern(graph, OpType::Var(name.clone()), vec![])),
+            Expr::Binary { op, left, right } => {
+                // `^` is special: Pow carries a *constant* exponent, so the
+                // right side must be a numeric literal and is NOT lowered as a
+                // child.
+                if let Token::Caret = op {
+                    let base = self.lower(left, graph)?;
+                    let exp = match right.as_ref() {
+                        Expr::Num(e) => *e,
+                        _ => {
+                            return Err(EngineError::UnexpectedToken {
+                                expected: "a numeric literal exponent".to_string(),
+                                found: format!("{:?}", right),
+                            });
+                        }
+                    };
+                    return Ok(self.intern(graph, OpType::Pow(exp), vec![base]));
+                }
+
+                // Everything else lowers both children, then interns.
+                let l = self.lower(left, graph)?;
+                let r = self.lower(right, graph)?;
+                let optype = match op {
+                    Token::Plus => OpType::Add,
+                    Token::Minus => OpType::Sub,
+                    Token::Star => OpType::Mul,
+                    Token::Slash => OpType::Div,
+                    other => {
+                        return Err(EngineError::UnexpectedToken {
+                            expected: "a binary operator".to_string(),
+                            found: format!("{:?}", other),
+                        });
+                    }
+                };
+                Ok(self.intern(graph, optype, vec![l, r]))
+            }
+            Expr::Unary { op, child } => {
+                let child_node: usize = self.lower(child, graph)?;
+                let optype = match op {
+                    Token::Minus => OpType::Neg,
+                    other => {
+                        return Err(EngineError::UnexpectedToken {
+                            expected: "a unary operator".to_string(),
+                            found: format!("{:?}", other),
+                        });
+                    }
+                };
+                Ok(self.intern(graph, optype, vec![child_node]))
+            }
+            // TODO(you): match fn_name ("sin"/"cos"/"exp"/"ln"), error otherwise.
+            Expr::Call { fn_name, arg } => {
+                let child_node: usize = self.lower(arg, graph)?;
+                let optype = match fn_name.as_str() {
+                    "sin" => OpType::Sin,
+                    "cos" => OpType::Cos,
+                    "ln" => OpType::Ln,
+                    "exp" => OpType::Exp,
+                    other => {
+                        return Err(EngineError::UnexpectedToken {
+                            expected: "a known function name".to_string(),
+                            found: other.to_string(),
+                        });
+                    }
+                };
+
+                Ok(self.intern(graph, optype, vec![child_node]))
+            }
+        }
+    }
+
+    /// The shared create-or-reuse step every arm funnels through.
+    fn intern(&mut self, graph: &mut Graph, op: OpType, inputs: Vec<usize>) -> usize {
+        let key = NodeKey::new(&op, &inputs);
+        if let Some(&idx) = self.memo.get(&key) {
+            return idx;
+        }
+        let idx = graph.push(Node {
+            op,
+            inputs,
+            value: 0.0,
+            adjoint: 0.0,
+        });
+        self.memo.insert(key, idx);
+        idx
+    }
+}

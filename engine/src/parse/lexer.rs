@@ -91,10 +91,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Drive `next_token` to exhaustion, collecting the whole stream into a
-    /// `Vec`. The trailing `Eof` is kept in the result so the parser can peek
-    /// past the last real token without bounds-checking. The first lexer error
-    /// short-circuits via `?`, so a bad source yields `Err`, not a partial Vec.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, EngineError> {
         let mut result: Vec<Token> = Vec::new();
         loop {
@@ -147,10 +143,19 @@ impl<'a> Lexer<'a> {
 mod tests {
     use super::*;
 
-    /// Lex `src` end to end via `tokenize`, so these tests drive the same
-    /// collection path the parser uses rather than a separate copy of the loop.
+    /// Drive `next_token` to exhaustion, returning the full token stream
+    /// (with the trailing `Eof`) or the first error the lexer hits.
     fn lex_all(src: &str) -> Result<Vec<Token>, EngineError> {
-        Lexer::new(src).tokenize()
+        let mut lexer = Lexer::new(src);
+        let mut tokens = Vec::new();
+        loop {
+            let tok = lexer.next_token()?;
+            let done = tok == Token::Eof;
+            tokens.push(tok);
+            if done {
+                return Ok(tokens);
+            }
+        }
     }
 
     // The canonical expression from the roadmap: 10 content tokens + Eof.
