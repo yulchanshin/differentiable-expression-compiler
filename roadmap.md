@@ -1,5 +1,4 @@
 # Gradient Engine — Product Roadmap (Rust-Engine Edition)
-
 > A differentiable expression compiler & durable optimization service. Rust engine (the compiler + automatic differentiation + solvers), Go service layer, TypeScript visualizer. **Sequenced math-first so you learn Rust on the interesting part.**
 
 **Duration:** ~3–5 weeks (Rust learning included) · **Owner:** Yulchan · **Last updated:** July 2026
