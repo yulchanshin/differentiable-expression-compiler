@@ -11,7 +11,6 @@
 //! equality of two subexpressions reduces to equality of their keys.
 //!
 //! ## Why [`NodeKey`] and not [`OpType`] as the key
-//!
 //! [`OpType`] carries `f64` payloads (`Const`, `Pow`), and `f64` implements
 //! neither `Eq` nor `Hash` because of `NaN` (`NaN != NaN`). A `HashMap` key
 //! must be both. So the key stores floats as their raw `u64` bit patterns via
@@ -31,7 +30,7 @@ use crate::parse::lexer::Token;
 /// The op portion of a [`NodeKey`], with every `f64` payload replaced by its
 /// `to_bits()` representation so the whole thing can derive `Eq` + `Hash`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum OpKey {
+pub enum OpKey {
     Var(String),
     Const(u64), // f64::to_bits
     Add,
@@ -49,9 +48,9 @@ enum OpKey {
 /// A structural fingerprint of a node: its op plus the indices of its inputs.
 /// Two subexpressions that build the same key are the same node.
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct NodeKey {
-    op: OpKey,
-    inputs: Vec<usize>,
+pub struct NodeKey {
+    pub op: OpKey,
+    pub inputs: Vec<usize>,
 }
 
 impl NodeKey {
