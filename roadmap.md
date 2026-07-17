@@ -1,4 +1,5 @@
 # Gradient Engine — Product Roadmap (Rust-Engine Edition)
+
 > A differentiable expression compiler & durable optimization service. Rust engine (the compiler + automatic differentiation + solvers), Go service layer, TypeScript visualizer. **Sequenced math-first so you learn Rust on the interesting part.**
 
 **Duration:** ~3–5 weeks (Rust learning included) · **Owner:** Yulchan · **Last updated:** July 2026
@@ -384,7 +385,7 @@ gradient-engine/
 - [X] `TICKET-302` AST → graph lowering (hash-consing)
 
 ### Phase 4 — Optimization passes
-- [ ] `TICKET-400` Constant folding
+- [x] `TICKET-400` Constant folding
 - [ ] `TICKET-401` Common-subexpression elimination
 - [ ] `TICKET-402` Dead-node elimination + node-count benchmark
 
@@ -760,8 +761,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 **Detail:** Single topological pass; if all a node's inputs are `Const`, compute and replace with `Const`. Re-run to fixpoint or fold in one sweep (inputs precede consumers).
 
 **Acceptance criteria:**
-- [ ] `x + 2*3` folds `2*3 → 6`, leaving `x + 6` (assert node count drop).
-- [ ] Property test: random points give identical results pre/post fold.
+- [X] `x + 2*3` folds `2*3 → 6`, leaving `x + 6` (assert node count drop).
+- [X] Property test: random points give identical results pre/post fold.
 
 🦀 **Rust concepts introduced:** in-place `Vec` mutation/rewriting; matching on `OpType` + input kinds; `#[cfg(test)]` property-style loops.
 
@@ -777,8 +778,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 **Detail:** Key each node by `(op, canonicalized inputs, attr)`; redirect duplicates to a canonical index; drop orphans. Canonicalize commutative operands (`a*b` == `b*a`).
 
 **Acceptance criteria:**
-- [ ] A graph with duplicated subexpressions collapses to minimal shared form (assert node count).
-- [ ] Result-preserving property test passes.
+- [X] A graph with duplicated subexpressions collapses to minimal shared form (assert node count).
+- [X] Result-preserving property test passes.
 
 🦀 **Rust concepts introduced:** `HashMap`-based value numbering; canonical ordering (`.sort()` on inputs); index remapping across the arena.
 
