@@ -164,15 +164,13 @@ mod tests {
     /// Lex then fully parse a valid expression (through `parse`, so the
     /// trailing-`Eof` check runs too), unwrapping both steps.
     fn parse(src: &str) -> Expr {
-        let tokens = crate::parse::lexer::Lexer::new(src).tokenize().unwrap();
-        Parser::new(tokens).parse().unwrap()
+        crate::parse::parse(crate::parse::lex(src).unwrap()).unwrap()
     }
 
     /// Lex then parse source expected to be invalid, returning the error so a
     /// test can assert on its kind. Panics if the input unexpectedly parses.
     fn parse_err(src: &str) -> EngineError {
-        let tokens = crate::parse::lexer::Lexer::new(src).tokenize().unwrap();
-        Parser::new(tokens).parse().unwrap_err()
+        crate::parse::parse(crate::parse::lex(src).unwrap()).unwrap_err()
     }
 
     // Small tree builders so the expected ASTs read close to the source.
