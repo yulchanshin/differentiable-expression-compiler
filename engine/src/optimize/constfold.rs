@@ -20,6 +20,7 @@
 
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
+use crate::ops::eval::eval_op;
 
 impl Graph {
     /// Fold every all-constant node into a single `Const` in one topological
@@ -39,40 +40,25 @@ impl Graph {
             let mut vals: Vec<f64> = Vec::with_capacity(self.nodes[i].inputs.len());
             for k in 0..self.nodes[i].inputs.len() {
                 //checking if input node is a constant
-                match self.nodes[self.nodes[i].inputs[k]].op {
-                    OpType::Const(c) => vals.push(c),
+                match &self.nodes[self.nodes[i].inputs[k]].op {
+                    OpType::Const(c) => vals.push(*c),
                     _ => break,
                 }
             }
 
             //if not all inputs were const, this evaluates to true
-            if (vals.len() != self.nodes[i].inputs.len()) {
+            if vals.len() != self.nodes[i].inputs.len() {
                 continue;
             }
 
-            let result: f64 = match &self.nodes[i].op {
-                OpType::Add => vals[0] + vals[1],
-                OpType::Sub => vals[0] - vals[1],
-                OpType::Mul => vals[0] * vals[1],
-                OpType::Div => vals[0] / vals[1],
-                OpType::Neg => -vals[0],
-                OpType::Pow(n) => {
-                    if vals[0] < 0.0 && n.fract() != 0.0 { 
-                        continue;
-                    }
-                    vals[0].powf(*n) 
-                }
-                OpType::Sin => vals[0].sin(),
-                OpType::Cos => vals[0].cos(),
-                OpType::Exp => vals[0].exp(),
-                OpType::Ln  => {
-                    if vals[0] <= 0.0 { 
-                        continue; 
-                    } 
-                    vals[0].ln() 
-                }
-                _ => continue,
-            }
+            // Evaluate with the shared op semantics; a domain failure means we
+            // leave the node unfolded so the error still surfaces at real
+            // evaluation time rather than baking an inf/NaN constant.
+            let result = match eval_op(&self.nodes[i].op, &vals) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
             self.nodes[i].op = OpType::Const(result);
             self.nodes[i].inputs.clear();
             count += 1;
