@@ -8,6 +8,7 @@
 use crate::error::EngineError;
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
+use crate::ops::eval::eval_op;
 use std::collections::HashMap;
 
 // Index order is a valid topological order: builder helpers always push a
@@ -20,62 +21,15 @@ impl Graph {
                 OpType::Var(name) => *inputs
                     .get(name)
                     .ok_or_else(|| EngineError::UnknownVariable(name.clone()))?,
-                OpType::Add => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
-                    a + b
-                }
-                OpType::Sub => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
-                    a - b
-                }
-                OpType::Div => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
-                    if b == 0.0 {
-                        return Err(EngineError::DivByZero);
-                    }
-                    a / b
-                }
-                OpType::Mul => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    let b: f64 = self.nodes[self.nodes[i].inputs[1]].value;
-                    a * b
-                }
-                OpType::Neg => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    -1.0 * a
-                }
-                OpType::Pow(n) => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    if a < 0.0 && n.fract() != 0.0 {
-                        return Err(EngineError::DomainError(format!(
-                            "pow with negative base {a} and non-integer exponent {n}"
-                        )));
-                    }
-                    a.powf(*n)
-                }
-                OpType::Sin => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    a.sin()
-                }
-                OpType::Cos => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    a.cos()
-                }
-                OpType::Exp => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    a.exp()
-                }
-                OpType::Ln => {
-                    let a: f64 = self.nodes[self.nodes[i].inputs[0]].value;
-                    if a <= 0.0 {
-                        return Err(EngineError::DomainError(format!(
-                            "ln requires x > 0, but got {a}"
-                        )));
-                    }
-                    a.ln()
+                // Every operator node shares one scalar-eval definition with the
+                // constant-folding pass so their semantics can't drift.
+                _ => {
+                    let vals: Vec<f64> = self.nodes[i]
+                        .inputs
+                        .iter()
+                        .map(|&k| self.nodes[k].value)
+                        .collect();
+                    eval_op(&self.nodes[i].op, &vals)?
                 }
             };
             self.nodes[i].value = value;
