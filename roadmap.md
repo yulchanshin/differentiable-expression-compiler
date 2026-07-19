@@ -386,7 +386,7 @@ gradient-engine/
 
 ### Phase 4 — Optimization passes
 - [x] `TICKET-400` Constant folding
-- [ ] `TICKET-401` Common-subexpression elimination
+- [x] `TICKET-401` Common-subexpression elimination
 - [ ] `TICKET-402` Dead-node elimination + node-count benchmark
 
 ### Phase 4.5 — Symbolic differentiation (the contrast piece)
