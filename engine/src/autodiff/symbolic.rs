@@ -19,9 +19,14 @@
 //! ## No sharing on purpose
 //! `diff` deliberately does not memoize: the product rule duplicates subtrees,
 //! and differentiating a shared node twice rebuilds it twice. That swell is the
-//! whole point of the exercise (TICKET-450); CSE reclaims the duplication
-//! afterward. Const-folding then removes the `*1`/`+0`/`k` litter these naive
-//! rules spray everywhere.
+//! whole point of the exercise (TICKET-450). The Phase 4 optimizer then claws
+//! some of it back: `const_fold` collapses the fully-constant subexpressions the
+//! rules produce (e.g. the `k - 1` exponent arithmetic of the power rule), `cse`
+//! re-shares duplicated subtrees, and `dce` reclaims the orphans. Note it is
+//! only a *partial* cleanup: `const_fold` folds all-constant nodes, not algebraic
+//! identities, so `x * 1` and `x + 0` (a variable times/plus a constant) survive.
+//! Removing those would need a dedicated simplification pass, which this engine
+//! does not have — so the reduction is real but modest.
 
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;
