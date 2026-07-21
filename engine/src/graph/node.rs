@@ -7,7 +7,7 @@ pub struct Node {
     pub adjoint: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpType {
     Var(String),
     Const(f64),
