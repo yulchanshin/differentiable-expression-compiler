@@ -43,5 +43,6 @@ yarn-error.log*
 *~
 
 .claude
+CLAUDE.md
 # --- Misc build/bench artifacts ---
 bench/results/*.tmp

@@ -30,7 +30,7 @@ optimizer, solvers, and surrounding service layers are scaffolded and land next
 | Forward evaluation                          | Implemented |
 | Reverse-mode autodiff (gradient, Jacobian)  | Implemented |
 | Trace export for visualization              | Implemented |
-| Optimizer (const-fold, CSE, dead-node)      | In progress |
+| Optimizer (const-fold, CSE, dead-node)      | Implemented |
 | Solvers (Newton, inverse kinematics)        | Planned     |
 | Dense linear algebra (LU with pivoting)     | Planned     |
 | Go service layer + browser visualizer       | Planned     |
@@ -438,11 +438,14 @@ expression swell:
 - **Common-subexpression elimination:** merge structurally identical nodes
   (largely handled at lowering by hash-consing, implemented again as an explicit,
   benchmarkable pass).
-- **Dead-node elimination:** drop nodes unreachable from the output and record
-  before-and-after node counts as a benchmark artifact.
+- **Dead-node elimination:** drop nodes unreachable from the output (the orphans
+  const-folding and CSE leave behind) and renumber the arena. The `bench/`
+  harness runs the suite through the full `const_fold -> cse -> dce` pipeline and
+  records before-and-after node counts to `bench/results/node_counts.json`; on
+  the current suite the pipeline cuts total node count by **~43%** (54 -> 31).
 
-```rust
-// to come
+```sh
+cargo run --example node_count_bench   # from engine/, regenerates the artifact
 ```
 
 ### Solvers
@@ -494,7 +497,7 @@ engine/                  the Rust engine (this is the crate)
 server/                  Go service layer: REST, WebSocket, Temporal client   [planned]
 worker/                  Go Temporal workflows for durable solver runs         [planned]
 web/                     TypeScript + React visualizer: graph, IK arm, plot    [planned]
-bench/                   reverse-vs-forward cost benchmarks and results        [planned]
+bench/                   node-count benchmark + results (reverse-vs-forward planned)
 ```
 
 ## License
