@@ -3,9 +3,9 @@
 //! Integration test (compiles as its own crate, using `engine` from the
 //! outside). For each expression and each variable, three independently-derived
 //! numbers must agree at random points:
-//!   * **symbolic** — `Graph::diff` builds a derivative graph; evaluate it;
-//!   * **automatic** — the reverse-mode adjoint from `Graph::backward`;
-//!   * **numerical** — a central-difference estimate that only ever calls `f`.
+//!   * **symbolic**: `Graph::diff` builds a derivative graph, then evaluate it;
+//!   * **automatic**: the reverse-mode adjoint from `Graph::backward`;
+//!   * **numerical**: a central-difference estimate that only ever calls `f`.
 //!
 //! Symbolic and reverse-mode are both exact, so they must match tightly; the
 //! finite-difference oracle shares no code with the engine and is the loose,

@@ -1,14 +1,8 @@
-//! Arena Representation of the computation Graph
+//! Arena representation of the computation graph.
 //!
-//! All nodes of a graph live in one `Vec<Node>` that owns them.
-//! Nodes refer to each other by `usize` index and not by `Rc`.
-//!
-//! Why indices instead of `Rc<RefCell<Node>>`:
-//!
-//! `Rc` allows the nodes to have multiple owners and `RefCell` allows
-//! these `Rc` nodes to be mutable. Therefore, there is a chance of a
-//! runtime panic happening due to `RefCell`'s runtime borrow checking.
-//! With `Vec<Node>` this shouldn't be an issue as we enforce single ownership.
+//! All nodes live in one `Vec<Node>` that owns them; nodes reference each other
+//! by `usize` index, not `Rc`. Indices keep single ownership and avoid the
+//! runtime borrow panics an `Rc<RefCell<Node>>` graph would risk.
 
 use crate::graph::node::{Node, OpType};
 

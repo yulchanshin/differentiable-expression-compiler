@@ -1,21 +1,14 @@
 //! Lowering the AST into the arena graph with hash-consing.
 //!
-//! The parser produces an [`Expr`] tree where every subexpression is owned
-//! exactly once. The compute graph is different: identical subexpressions
-//! should be a single *shared* node so that work done once is reused
-//! everywhere. `x*y + x*y` should build one `x*y` node, not two.
+//! The parser's [`Expr`] tree owns every subexpression once; the compute graph
+//! instead shares identical subexpressions as one node (`x*y + x*y` builds one
+//! `x*y`). Hash-consing gives that: before creating a node, look it up in a
+//! [`HashMap`] keyed by its structure `(op, inputs)`. Inputs are indices into
+//! already-deduplicated nodes, so structural equality reduces to key equality.
 //!
-//! We get that sharing for free with **hash-consing**: before creating a
-//! node we look it up in a [`HashMap`] keyed by its structure `(op, inputs)`.
-//! Because inputs are indices into already-deduplicated nodes, structural
-//! equality of two subexpressions reduces to equality of their keys.
-//!
-//! ## Why [`NodeKey`] and not [`OpType`] as the key
-//! [`OpType`] carries `f64` payloads (`Const`, `Pow`), and `f64` implements
-//! neither `Eq` nor `Hash` because of `NaN` (`NaN != NaN`). A `HashMap` key
-//! must be both, so [`NodeKey`] stores floats as their raw `u64` bit patterns.
-//! The key type lives in [`crate::graph::key`] because CSE (TICKET-401) keys
-//! nodes the same way; lowering uses the order-preserving [`NodeKey::new`].
+//! The key is [`NodeKey`] rather than [`OpType`] because `OpType`'s `f64`
+//! payloads are not `Eq`/`Hash`; it lives in [`crate::graph::key`] since CSE
+//! keys nodes the same way. Lowering uses the order-preserving [`NodeKey::new`].
 
 use std::collections::HashMap;
 

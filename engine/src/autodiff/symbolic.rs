@@ -1,32 +1,16 @@
 //! Symbolic differentiation as a graph-to-graph transform.
 //!
-//! Given an expression's root node and a variable, [`Graph::diff`] recursively
-//! *builds a new subgraph* for the derivative expression using the textbook
-//! rules (sum, product, quotient, power, chain) and returns the index of its
-//! root. This is the "symbolic" corner of the differentiation triangle: exact,
-//! like reverse-mode AD, but it produces a derivative *formula* (another graph)
-//! rather than a number, and it needs one pass per input variable.
+//! [`Graph::diff`] recurses an expression applying the textbook rules (sum,
+//! product, quotient, power, chain) and appends a new subgraph for the
+//! derivative, returning its root. It reuses the original nodes as
+//! subexpressions and never mutates them, so the arena only grows and the
+//! derivative root is the last node pushed.
 //!
-//! ## It appends, it does not rewrite
-//! `diff` pushes new nodes onto the same arena and reuses the original nodes as
-//! subexpressions (the product rule for `a*b` references the original `a` and
-//! `b`). It never mutates an existing node, so the original expression stays
-//! intact and evaluable; the arena simply grows. The derivative root is the last
-//! node pushed. Because the arena never renumbers (except in dead-node
-//! elimination), the input indices captured before a recursive call stay valid
-//! after it.
-//!
-//! ## No sharing on purpose
-//! `diff` deliberately does not memoize: the product rule duplicates subtrees,
-//! and differentiating a shared node twice rebuilds it twice. That swell is the
-//! whole point of the exercise (TICKET-450). The Phase 4 optimizer then claws
-//! some of it back: `const_fold` collapses the fully-constant subexpressions the
-//! rules produce (e.g. the `k - 1` exponent arithmetic of the power rule), `cse`
-//! re-shares duplicated subtrees, and `dce` reclaims the orphans. Note it is
-//! only a *partial* cleanup: `const_fold` folds all-constant nodes, not algebraic
-//! identities, so `x * 1` and `x + 0` (a variable times/plus a constant) survive.
-//! Removing those would need a dedicated simplification pass, which this engine
-//! does not have — so the reduction is real but modest.
+//! It deliberately does not memoize: the product rule duplicates subtrees, so
+//! the derivative graph swells, which is the point (TICKET-450). The Phase 4
+//! optimizer (`const_fold`, `cse`, `dce`) claws some of it back, but only
+//! partially: `const_fold` folds all-constant nodes, not identities, so `x * 1`
+//! and `x + 0` survive absent a dedicated simplification pass.
 
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;

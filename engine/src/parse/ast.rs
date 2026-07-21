@@ -1,10 +1,9 @@
 //! The expression AST produced by the parser.
 //!
-//! [`Expr`] is a recursive tree whose `Unary`, `Binary`, and `Call` variants
-//! own their children through `Box`. The `Box` is what makes the size finite:
-//! it is one pointer, so the enum no longer contains itself by value. A tree
-//! node solely owns its subtrees, so `Box` is enough; the compute graph shares
-//! subexpressions and needs the arena instead.
+//! [`Expr`] is a recursive tree whose `Unary`/`Binary`/`Call` variants own their
+//! children through `Box` (one pointer, so the enum stays a finite size). A tree
+//! owns its subtrees outright; the compute graph shares subexpressions and uses
+//! the arena instead.
 
 use crate::parse::lexer::Token;
 

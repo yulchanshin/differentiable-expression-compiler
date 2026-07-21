@@ -1,28 +1,14 @@
 //! Render a subgraph back into a readable infix formula.
 //!
-//! [`Graph::to_expr_string`] walks the subgraph rooted at a node and emits
-//! surface syntax like `cos(x * y) * y`, inserting parentheses only where
-//! operator precedence requires them. This is what makes symbolic
-//! differentiation legible (print `f` and `df/dx` as formulas) and is the
-//! formula artifact a symbolic-diff frontend renders.
+//! [`Graph::to_expr_string`] walks a subgraph and emits infix like
+//! `cos(x * y) * y`, parenthesizing only where precedence or associativity
+//! require it. The precedence levels mirror the parser's binding powers so the
+//! output re-parses with the same grouping.
 //!
-//! ## Precedence and associativity
-//! The precedence levels below mirror the parser's binding powers
-//! (`parse::parser::infix_binding_power`), so the output re-parses with the same
-//! grouping. Each node reports the precedence of its top operator; a child is
-//! parenthesized when it binds *looser* than its parent, plus the
-//! associativity tie-breaks: for left-associative `+ - * /` the right operand
-//! is wrapped on a tie (so `a - (b - c)` stays grouped), and a `^` base is
-//! wrapped on a tie (so `(x ^ 2) ^ 3` stays grouped, since `^` is
-//! right-associative).
-//!
-//! ## Not a perfect round-trip
-//! A formula prints for readability, not guaranteed re-lowering. `^` carries a
-//! *constant* exponent and the lexer has no negative number literal, so a
-//! `Pow` with a negative or fractional exponent (which derivatives routinely
-//! produce, e.g. `x ^ -0.5`) prints legibly but does not lower back through the
-//! front end. Formulas built only from non-negative literal exponents round-trip
-//! by value.
+//! Not a guaranteed round-trip: `^` needs a numeric-literal exponent and the
+//! lexer has no negative literal, so a `Pow` with a negative or fractional
+//! exponent prints legibly but does not lower back. Non-negative literal
+//! exponents round-trip by value.
 
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;

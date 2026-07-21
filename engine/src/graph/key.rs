@@ -1,18 +1,13 @@
 //! Structural fingerprints for graph nodes: [`OpKey`] and [`NodeKey`].
 //!
-//! Two subexpressions are "the same" when they have the same op and the same
-//! inputs. To detect that with a [`HashMap`](std::collections::HashMap) we need
-//! a key that is both `Eq` and `Hash`. [`OpType`] can't serve directly: its
-//! `Const`/`Pow` payloads are `f64`, which implements neither trait
-//! (`NaN != NaN`). [`OpKey`] mirrors [`OpType`] but stores those floats as their
-//! raw `u64` bit patterns via [`f64::to_bits`], giving exact-bit deduplication:
-//! two `2.0`s collapse, and we make no attempt to prove `0.1 + 0.2 == 0.3`.
+//! Two subexpressions are the same when they share an op and inputs. Keying that
+//! in a `HashMap` needs `Eq + Hash`, which [`OpType`] lacks because its
+//! `Const`/`Pow` `f64` payloads are not (`NaN != NaN`). [`OpKey`] mirrors
+//! [`OpType`] but stores those floats as raw `u64` bits, giving exact-bit dedup
+//! (two `2.0`s collapse; no attempt to prove `0.1 + 0.2 == 0.3`).
 //!
-//! Two constructors exist because two passes want slightly different notions of
-//! "same". [`NodeKey::new`] preserves operand order and backs lowering's
-//! hash-consing, where the AST already fixes operand order. [`NodeKey::canonical`]
-//! additionally sorts the operands of commutative ops so `a*b` and `b*a` key
-//! identically, which is what common-subexpression elimination needs.
+//! [`NodeKey::new`] preserves operand order (lowering). [`NodeKey::canonical`]
+//! also sorts commutative operands so `a*b` and `b*a` key alike (CSE).
 
 use crate::graph::node::OpType;
 

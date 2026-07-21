@@ -1,7 +1,7 @@
 //! Expression-swell benchmark for symbolic differentiation (TICKET-450).
 //!
 //! Symbolic `diff` produces a derivative *graph* that is conspicuously larger
-//! than the original — the naive product/chain rules duplicate subtrees and
+//! than the original: the naive product/chain rules duplicate subtrees and
 //! spray `*1`/`+0`/constant litter. Differentiate a second time and it balloons
 //! again (swell squared). This benchmark measures that, then runs the Phase 4
 //! optimizer (`const_fold -> cse -> dce`) on the first derivative and records how

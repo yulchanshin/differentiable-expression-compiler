@@ -215,7 +215,7 @@ fn sub() {
 // true gradient 2x (= 6 at x=3), but we assert a deliberately wrong value of
 // 0.0 against the numerical estimate. The oracle should reject it. This is
 // the permanent stand-in for "temporarily break a derivative and watch a
-// test fail" — it guarantees the assertion actually fires on mismatch.
+// test fail": it guarantees the assertion actually fires on mismatch.
 #[test]
 #[should_panic(expected = "grad mismatch")]
 fn oracle_catches_wrong_gradient() {
