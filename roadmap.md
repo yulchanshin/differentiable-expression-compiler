@@ -387,7 +387,7 @@ gradient-engine/
 ### Phase 4 — Optimization passes
 - [x] `TICKET-400` Constant folding
 - [x] `TICKET-401` Common-subexpression elimination
-- [ ] `TICKET-402` Dead-node elimination + node-count benchmark
+- [x] `TICKET-402` Dead-node elimination + node-count benchmark
 
 ### Phase 4.5 — Symbolic differentiation (the contrast piece)
 - [ ] `TICKET-450` Symbolic diff (graph → graph) + expression-swell demo
@@ -795,8 +795,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 **Detail:** Reverse-reachability mark from output(s); drop unmarked; renumber indices. `bench/` script runs a suite through the full pass pipeline, writes raw-vs-optimized node counts to `bench/results/`.
 
 **Acceptance criteria:**
-- [ ] Unreachable nodes removed; output value unchanged.
-- [ ] Benchmark artifact committed; README cites a reduction figure.
+- [x] Unreachable nodes removed; output value unchanged.
+- [x] Benchmark artifact committed; README cites a reduction figure.
 
 🦀 **Rust concepts introduced:** graph traversal (reachability) over the arena; `Vec<bool>` mark sets; index renumbering with a remap table.
 
