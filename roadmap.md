@@ -390,7 +390,7 @@ gradient-engine/
 - [x] `TICKET-402` Dead-node elimination + node-count benchmark
 
 ### Phase 4.5 — Symbolic differentiation (the contrast piece)
-- [ ] `TICKET-450` Symbolic diff (graph → graph) + formula pretty-printer + expression-swell demo
+- [x] `TICKET-450` Symbolic diff (graph → graph) + formula pretty-printer + expression-swell demo
 - [ ] ~~`TICKET-451` Higher-order derivatives (f″, Hessian) via repeated symbolic diff~~ — **deferred** (pure bonus; Newton/IK are first-order and never need it)
 
 ### Phase 5 — Solvers
@@ -831,10 +831,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 - **The punchline (write it as a comment/README note):** even optimized, symbolic diff needs **one `diff` pass per input variable** to get a full gradient (n passes for n inputs), whereas reverse-mode gets the whole gradient in **one** backward pass. That asymmetry — not correctness — is *why* AD exists.
 
 **Acceptance criteria:**
-- [ ] `diff` produces a derivative graph whose forward-evaluation matches the reverse-mode adjoint **and** the finite-difference oracle at several random points (three-way agreement) for ≥ 6 expressions.
-- [ ] `to_expr_string` round-trips: re-parsing its output (Phase 3 front end) reproduces the same graph structure, and it renders a hand-checked derivative formula correctly.
-- [ ] Node-count table recorded: original vs raw-derivative vs optimized-derivative, showing the swell and the optimizer's reduction.
-- [ ] A short written note (comment or README) states why reverse-mode still beats symbolic for many-input gradients.
+- [x] `diff` produces a derivative graph whose forward-evaluation matches the reverse-mode adjoint **and** the finite-difference oracle at several random points (three-way agreement) for ≥ 6 expressions. *(`tests/symbolic_diff.rs`, 7 expressions.)*
+- [x] `to_expr_string` round-trips **by value**: re-compiling its output (Phase 3 front end) evaluates identically, and it renders hand-checked formulas correctly. *(Structural round-trip is not always possible — `^` needs a numeric-literal exponent and the lexer has no negative literal, so a `Pow` with a negative/fractional exponent prints but does not lower back.)*
+- [x] Node-count table recorded: original vs raw-derivative vs optimized-derivative, showing the swell and the optimizer's reduction. *(`bench/results/symbolic_swell.json`; README cites it.)*
+- [x] A short written note (comment or README) states why reverse-mode still beats symbolic for many-input gradients. *(README “Symbolic differentiation” section.)*
 
 🦀 **Rust concepts introduced:** recursion that **mutates the arena while returning a fresh index** (watch the borrow checker — compute child indices into locals *before* the `push` that consumes them, same lesson as TICKET-103); `match` on `OpType` dispatching to per-op rules; reusing the TICKET-101 builder helpers as the "constructors" of the derivative graph; composing existing passes as a library.
 

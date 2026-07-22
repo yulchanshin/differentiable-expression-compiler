@@ -31,6 +31,7 @@ optimizer, solvers, and surrounding service layers are scaffolded and land next
 | Reverse-mode autodiff (gradient, Jacobian)  | Implemented |
 | Trace export for visualization              | Implemented |
 | Optimizer (const-fold, CSE, dead-node)      | Implemented |
+| Symbolic differentiation + formula printer  | Implemented |
 | Solvers (Newton, inverse kinematics)        | Planned     |
 | Dense linear algebra (LU with pivoting)     | Planned     |
 | Go service layer + browser visualizer       | Planned     |
@@ -422,6 +423,45 @@ validated the same way, and a golden JSON file pins the visualization trace.
 cd engine
 cargo test            # includes the finite-difference harness and golden trace
 ```
+
+## Symbolic differentiation (the contrast piece)
+
+A bonus pass that makes the difference between the *three* ways to differentiate
+concrete. `Graph::diff(node, wrt)` implements classic **symbolic** differentiation
+as a graph-to-graph transform: it recurses the expression applying the textbook
+rules (sum, product, quotient, power, chain) and *appends a new subgraph* for the
+derivative, returning its root. A companion pretty-printer, `to_expr_string`,
+renders any subgraph back to an infix formula, so a derivative reads as
+`cos(x * y) * (1 * y + x * 0)` rather than a pile of nodes.
+
+Building it is how you *feel* the swell everyone warns about. The naive rules
+duplicate subtrees and spray `*1`/`+0` litter, so the derivative graph is
+markedly larger than the original — and a second derivative balloons again:
+
+| expression | original | d/dx (raw) | d²/dx² (raw) | d/dx (optimized) |
+|---|---|---|---|---|
+| `x * y * z` | 5 | 13 | 35 | 12 |
+| `sin(x*y) * cos(x*z)` | 8 | 25 | 88 | 22 |
+| `(x+y)*(x-y)*(x+2*y)` | 9 | 27 | 79 | 19 |
+
+Running the Phase 4 optimizer (`const_fold → cse → dce`) on the raw first
+derivative claws back **~18%** of the nodes across the suite (regenerate with
+`cargo run --example symbolic_swell_bench`). The win is real but modest, and
+honestly so: `const_fold` only folds *all-constant* subexpressions, not algebraic
+identities, so `x * 1` and `x + 0` survive — clearing those would take a dedicated
+simplification pass the engine doesn't (yet) have.
+
+The derivative is validated three ways: for ≥6 expressions at random points, the
+symbolic derivative, the reverse-mode adjoint, and a finite-difference estimate
+must all agree (`tests/symbolic_diff.rs`).
+
+**Why automatic differentiation still wins.** Symbolic diff is exact, like
+reverse-mode — but it differentiates one variable at a time, so a full gradient
+of `f: ℝⁿ → ℝ` costs **n** `diff` passes. Reverse-mode gets the entire gradient in
+**one** backward pass, whatever n is. That asymmetry, not accuracy, is why AD is
+the tool of choice for many-input gradients. What symbolic buys in return is a
+reusable derivative *formula* you can render, re-evaluate, and (in principle)
+differentiate again.
 
 ## What's next
 

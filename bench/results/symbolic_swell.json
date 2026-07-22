@@ -1,0 +1,57 @@
+[
+  {
+    "name": "nested_product",
+    "expr": "x * y * z",
+    "wrt": "x",
+    "original_nodes": 5,
+    "raw_first_deriv_nodes": 13,
+    "raw_second_deriv_nodes": 35,
+    "optimized_first_deriv_nodes": 12,
+    "reduction_pct": 7.6923076923076925,
+    "raw_first_deriv_formula": "(1 * y + x * 0) * z + x * y * 0"
+  },
+  {
+    "name": "product_of_chains",
+    "expr": "sin(x * y) * cos(x * z)",
+    "wrt": "x",
+    "original_nodes": 8,
+    "raw_first_deriv_nodes": 25,
+    "raw_second_deriv_nodes": 88,
+    "optimized_first_deriv_nodes": 22,
+    "reduction_pct": 12.0,
+    "raw_first_deriv_formula": "cos(x * y) * (1 * y + x * 0) * cos(x * z) + sin(x * y) * (-sin(x * z) * (1 * z + x * 0))"
+  },
+  {
+    "name": "triple_product",
+    "expr": "(x + y) * (x - y) * (x + 2*y)",
+    "wrt": "x",
+    "original_nodes": 9,
+    "raw_first_deriv_nodes": 27,
+    "raw_second_deriv_nodes": 79,
+    "optimized_first_deriv_nodes": 19,
+    "reduction_pct": 29.629629629629626,
+    "raw_first_deriv_formula": "((1 + 0) * (x - y) + (x + y) * (1 - 0)) * (x + 2 * y) + (x + y) * (x - y) * (1 + (0 * y + 2 * 0))"
+  },
+  {
+    "name": "exp_ln_mix",
+    "expr": "exp(x * y) + ln(x + y)",
+    "wrt": "x",
+    "original_nodes": 7,
+    "raw_first_deriv_nodes": 18,
+    "raw_second_deriv_nodes": 52,
+    "optimized_first_deriv_nodes": 14,
+    "reduction_pct": 22.22222222222222,
+    "raw_first_deriv_formula": "exp(x * y) * (1 * y + x * 0) + 1 / (x + y) * (1 + 0)"
+  },
+  {
+    "name": "poly",
+    "expr": "x^2 * y^2 + x * y",
+    "wrt": "x",
+    "original_nodes": 7,
+    "raw_first_deriv_nodes": 23,
+    "raw_second_deriv_nodes": 71,
+    "optimized_first_deriv_nodes": 20,
+    "reduction_pct": 13.043478260869565,
+    "raw_first_deriv_formula": "2 * x ^ 1 * 1 * y ^ 2 + x ^ 2 * (2 * y ^ 1 * 0) + (1 * y + x * 0)"
+  }
+]
