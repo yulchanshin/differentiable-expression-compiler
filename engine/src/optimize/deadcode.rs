@@ -1,34 +1,11 @@
 //! Dead-node elimination (DCE): drop nodes unreachable from the output.
 //!
-//! Constant folding and CSE mutate the arena in place and never delete: a
-//! folded input or a redirected duplicate stays resident as an *orphan*,
-//! unreachable from the output but still occupying an index (and still
-//! needlessly evaluated by the forward pass). DCE is the pass that reclaims
-//! them. It is the *one* pass that renumbers the arena, so it runs last in the
-//! pipeline (`const_fold -> cse -> dce`) once the earlier passes have stranded
-//! everything they are going to strand.
-//!
-//! ## The algorithm
-//! 1. **Mark.** Reverse-reachability from the output. The output is the last
-//!    node (`len - 1`), matching the convention the forward pass relies on
-//!    (`autodiff::forward` returns `nodes[len - 1]`). Walk input edges backward,
-//!    marking every node the output actually depends on.
-//! 2. **Renumber.** Assign new indices to the marked nodes in ascending old
-//!    order, recorded in a `remap` table.
-//! 3. **Compact.** Move the marked nodes into a fresh `Vec`, rewriting each
-//!    node's inputs through `remap`.
-//!
-//! ## Why ascending order is load-bearing
-//! The arena's core invariant is "index order is a valid topological order": a
-//! node's inputs always sit at lower indices (builder helpers push inputs
-//! first), so the forward pass can evaluate in plain index order. Compacting in
-//! ascending old-index order preserves that invariant: survivors keep their
-//! relative order, so inputs still precede their consumers. It also keeps the
-//! output last (it had the highest index and is reachable from itself), so the
-//! forward pass keeps returning the right node with no changes.
-//!
-//! Because DCE renumbers, any index cached before it runs is invalid afterward.
-//! That is the price of compaction, and the reason no other pass renumbers.
+//! Constant folding and CSE never delete; they leave redirected or folded nodes
+//! resident as unreachable orphans. DCE reclaims them: mark reverse reachability
+//! from the output (the last node), then compact the survivors into a fresh
+//! arena. Compacting in ascending index order preserves the "inputs precede
+//! their node" invariant the forward pass relies on and keeps the output last.
+//! DCE is the only pass that renumbers, so any index cached before it is stale.
 
 use crate::graph::arena::Graph;
 

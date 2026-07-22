@@ -1,22 +1,13 @@
 //! Constant folding: evaluate all-constant subgraphs at compile time.
 //!
-//! If every input of a node is a `Const`, the node's value is fixed and can be
-//! computed now, replacing the node with a single `Const`. This shrinks the
-//! graph and lets constants ripple upward so later consumers fold too.
-//!
-//! A single forward sweep suffices, no fixpoint loop needed. Index order is a
-//! valid topological order (builder helpers push a node's inputs before the
-//! node itself), so by the time the sweep reaches node `i`, any input that
-//! could fold already has. A freshly folded `Const` is therefore visible to
-//! every consumer downstream of it in the same pass.
-//!
-//! Folding rewrites nodes in place; it does not compact the arena. The former
-//! input nodes (e.g. the `2` and `3` in `2 * 3`) stay resident but become
-//! unreachable, and are reclaimed later by dead-node elimination. Nodes whose
-//! evaluation would fail a domain check (division by zero, `ln` of a
-//! non-positive value, `pow` of a negative base to a fractional exponent) are
-//! left untouched so the error still surfaces at real evaluation time rather
-//! than being baked into an `inf`/`NaN` constant.
+//! When every input of a node is a `Const`, its value is fixed, so we replace
+//! the node with a single `Const`. One forward sweep suffices (index order is
+//! topological), so a folded constant is visible to its consumers in the same
+//! pass. Folding rewrites in place and does not compact; the former inputs
+//! become unreachable and are reclaimed by dead-node elimination. A node whose
+//! evaluation would fail a domain check (div by zero, `ln` of a non-positive
+//! value, `pow` of a negative base to a fractional power) is left untouched so
+//! the error still surfaces at real evaluation time.
 
 use crate::graph::arena::Graph;
 use crate::graph::node::OpType;

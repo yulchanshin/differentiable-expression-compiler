@@ -1,30 +1,14 @@
-//! Common-subexpression elimination (CSE) as a standalone pass.
+//! Common-subexpression elimination (CSE): merge structurally identical nodes.
 //!
-//! Hash-consing at lowering already prevents duplicate subexpressions from a
-//! single parse. CSE is the same idea applied to an *arbitrary* graph, run as a
-//! distinct, visible pass so it is demonstrable on graphs built by hand or by
-//! earlier optimization passes (constant folding, and later symbolic diff).
+//! Lowering already hash-conses a single parse; CSE applies the same idea to an
+//! arbitrary graph as a visible pass, so it also catches duplicates built by
+//! hand or produced by other passes. One forward sweep (index order is
+//! topological): rewrite each node's inputs to their canonical representative,
+//! key it via [`NodeKey::canonical`] (which sorts commutative operands so `a*b`
+//! and `b*a` collapse), then reuse an existing representative or become one.
 //!
-//! ## The algorithm
-//! One forward sweep. Index order is a valid topological order (builder helpers
-//! push a node's inputs before the node itself), so by the time the sweep
-//! reaches node `i`, every input has already been assigned its canonical
-//! representative. For each node we:
-//!
-//! 1. rewrite its inputs to their canonical representatives via `remap`;
-//! 2. build a [`NodeKey::canonical`] key, which sorts the operands of
-//!    commutative ops so `a*b` and `b*a` collapse to one node;
-//! 3. look the key up: a hit redirects this node to the existing representative
-//!    (recorded in `remap`); a miss registers this node as the representative.
-//!
-//! ## In place, no compaction
-//! Like constant folding, CSE mutates the arena in place and does *not* remove
-//! nodes. A redirected duplicate stays resident but becomes unreachable from
-//! the output; those orphans are reclaimed later by dead-node elimination
-//! (TICKET-402), which is the one pass that renumbers the arena. The `forward`
-//! pass keeps working meanwhile: it returns the last node, and a redirected
-//! duplicate still evaluates to the correct value because its own inputs were
-//! rewritten to the canonical representatives.
+//! Like constant folding it rewrites in place and never removes nodes; redirected
+//! duplicates become unreachable orphans that dead-node elimination reclaims.
 
 use std::collections::HashMap;
 

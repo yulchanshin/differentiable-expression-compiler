@@ -1,6 +1,7 @@
 //! Per-op local derivative rules.
 //!
-//! The §4.3 local derivatives currently live inline in the backward pass
-//! (`autodiff::backward`), kept adjacent to nothing else. This module is
-//! reserved for factoring each op's forward rule and its derivative into one
-//! place so the two can't drift (the optional refactor noted in TICKET-200).
+//! Reserved to factor each op's derivative into one place so the two consumers
+//! can't drift. The rules currently live in two independent sites: the
+//! reverse-mode partials in `autodiff::backward`, and the graph-to-graph
+//! rewrites in `autodiff::symbolic`. Adding an `OpType` means updating both (as
+//! well as forward eval in `ops::eval`). The optional TICKET-200 refactor.

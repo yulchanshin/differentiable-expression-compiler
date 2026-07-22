@@ -1,14 +1,8 @@
-//! Arena Representation of the computation Graph
+//! Arena representation of the computation graph.
 //!
-//! All nodes of a graph live in one `Vec<Node>` that owns them.
-//! Nodes refer to each other by `usize` index and not by `Rc`.
-//!
-//! Why indices instead of `Rc<RefCell<Node>>`:
-//!
-//! `Rc` allows the nodes to have multiple owners and `RefCell` allows
-//! these `Rc` nodes to be mutable. Therefore, there is a chance of a
-//! runtime panic happening due to `RefCell`'s runtime borrow checking.
-//! With `Vec<Node>` this shouldn't be an issue as we enforce single ownership.
+//! All nodes live in one `Vec<Node>` that owns them; nodes reference each other
+//! by `usize` index, not `Rc`. Indices keep single ownership and avoid the
+//! runtime borrow panics an `Rc<RefCell<Node>>` graph would risk.
 
 use crate::graph::node::{Node, OpType};
 
@@ -27,112 +21,64 @@ impl Graph {
         len
     }
 
-    pub fn var(&mut self, name: String) -> usize {
+    // All builder helpers funnel through these two: a node starts with zeroed
+    // `value`/`adjoint` (filled by the forward/backward passes) and differs only
+    // in its op and input list.
+    fn push_op(&mut self, op: OpType, inputs: Vec<usize>) -> usize {
         self.push(Node {
-            op: OpType::Var(name),
-            inputs: vec![],
+            op,
+            inputs,
             value: 0.0,
             adjoint: 0.0,
         })
+    }
+
+    pub fn var(&mut self, name: String) -> usize {
+        self.push_op(OpType::Var(name), vec![])
     }
 
     pub fn constant(&mut self, val: f64) -> usize {
-        self.push(Node {
-            op: OpType::Const(val),
-            inputs: vec![],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Const(val), vec![])
     }
 
     pub fn add(&mut self, a: usize, b: usize) -> usize {
-        self.push(Node {
-            op: OpType::Add,
-            inputs: vec![a, b],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Add, vec![a, b])
     }
 
     pub fn sub(&mut self, a: usize, b: usize) -> usize {
-        self.push(Node {
-            op: OpType::Sub,
-            inputs: vec![a, b],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Sub, vec![a, b])
     }
 
     pub fn div(&mut self, a: usize, b: usize) -> usize {
-        self.push(Node {
-            op: OpType::Div,
-            inputs: vec![a, b],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Div, vec![a, b])
     }
 
     pub fn mul(&mut self, a: usize, b: usize) -> usize {
-        self.push(Node {
-            op: OpType::Mul,
-            inputs: vec![a, b],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Mul, vec![a, b])
     }
 
     pub fn neg(&mut self, a: usize) -> usize {
-        self.push(Node {
-            op: OpType::Neg,
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Neg, vec![a])
     }
 
     pub fn pow(&mut self, a: usize, exp: f64) -> usize {
-        self.push(Node {
-            op: OpType::Pow(exp),
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Pow(exp), vec![a])
     }
 
     pub fn sin(&mut self, a: usize) -> usize {
-        self.push(Node {
-            op: OpType::Sin,
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Sin, vec![a])
     }
 
     pub fn cos(&mut self, a: usize) -> usize {
-        self.push(Node {
-            op: OpType::Cos,
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Cos, vec![a])
     }
 
     pub fn exp(&mut self, a: usize) -> usize {
-        self.push(Node {
-            op: OpType::Exp,
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Exp, vec![a])
     }
 
     pub fn ln(&mut self, a: usize) -> usize {
-        self.push(Node {
-            op: OpType::Ln,
-            inputs: vec![a],
-            value: 0.0,
-            adjoint: 0.0,
-        })
+        self.push_op(OpType::Ln, vec![a])
     }
 }
 

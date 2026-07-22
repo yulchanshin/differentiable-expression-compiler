@@ -19,7 +19,7 @@ use std::path::PathBuf;
 /// Build `sin(x*y) + x^2`, matching §7.3's node numbering (ids 0..=5).
 ///
 /// The arena pushes nodes in construction order and every op is created after
-/// its inputs, so a node's index is always greater than its inputs' — index
+/// its inputs, so a node's index is always greater than its inputs': index
 /// order is therefore a valid topological order, which is what `trace` emits.
 fn build_sin_xy_plus_x2() -> Graph {
     let mut g = Graph::new();

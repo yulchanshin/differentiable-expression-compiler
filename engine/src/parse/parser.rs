@@ -1,11 +1,9 @@
-//! Pratt (top-down operator-precedence) parser: turns the lexer's token stream
-//! into an [`Expr`] tree.
+//! Pratt (operator-precedence) parser: token stream to an [`Expr`] tree.
 //!
-//! `parse_expr` is the core. It seeds a left operand from `parse_atom`, then
-//! folds in infix operators for as long as they bind at least as tightly as the
-//! caller's `min_bp`. Precedence and associativity live entirely in the
-//! `(left_bp, right_bp)` pairs of `infix_binding_power`, so the loop stays small
-//! and those tables are the only thing to touch when adding an operator.
+//! `parse_expr` seeds a left operand from `parse_atom`, then folds in infix
+//! operators while they bind at least as tightly as the caller's `min_bp`.
+//! Precedence and associativity live entirely in `infix_binding_power`'s
+//! `(left_bp, right_bp)` pairs.
 
 use crate::error::EngineError;
 use crate::parse::ast::Expr;

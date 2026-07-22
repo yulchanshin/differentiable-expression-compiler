@@ -390,8 +390,8 @@ gradient-engine/
 - [x] `TICKET-402` Dead-node elimination + node-count benchmark
 
 ### Phase 4.5 — Symbolic differentiation (the contrast piece)
-- [ ] `TICKET-450` Symbolic diff (graph → graph) + expression-swell demo
-- [ ] `TICKET-451` Higher-order derivatives (f″, Hessian) via repeated symbolic diff
+- [x] `TICKET-450` Symbolic diff (graph → graph) + formula pretty-printer + expression-swell demo
+- [ ] ~~`TICKET-451` Higher-order derivatives (f″, Hessian) via repeated symbolic diff~~ — **deferred** (pure bonus; Newton/IK are first-order and never need it)
 
 ### Phase 5 — Solvers
 - [ ] `TICKET-500` LU linear solver
@@ -810,10 +810,12 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 
 ---
 
-#### TICKET-450 — Symbolic diff (graph → graph) + expression-swell demo
+#### TICKET-450 — Symbolic diff (graph → graph) + formula pretty-printer + expression-swell demo
 **Branch:** `feat/450-symbolic-diff`
 
-**Description:** Implement classic symbolic differentiation as a **graph-to-graph transform**: given an expression's root node and a variable, recursively *build a new subgraph* representing the derivative expression, using the textbook rules (sum, product, quotient, chain). Then measure the thing everyone warns about — the derivative graph growing far larger than the original — and show your optimizer clawing it back.
+**Description:** Implement classic symbolic differentiation as a **graph-to-graph transform**: given an expression's root node and a variable, recursively *build a new subgraph* representing the derivative expression, using the textbook rules (sum, product, quotient, chain). Then measure the thing everyone warns about — the derivative graph growing far larger than the original — and show your optimizer clawing it back. Also add a graph→formula pretty-printer so the derivative can be shown as a readable expression (`df/dx = cos(x*y)*y`), the artifact a future symbolic-diff frontend will render.
+
+**Scope note (revised):** TICKET-451 (higher-order derivatives / Hessian) is **deferred** — a pure bonus that nothing downstream needs. The actual React UI for symbolic diff lands with the `web/` phase; this ticket only makes the engine frontend-*ready* by emitting the two artifacts that UI consumes: the formula string (new, below) and the serialized derivative graph (already free via `autodiff::trace`, which serializes any subgraph rooted at a given node).
 
 **Detail:**
 - `fn diff(&mut self, node: usize, wrt: &str) -> usize`: recurse on the node's `OpType`, **pushing new nodes** onto the arena and returning the index of the derivative expression's root. The rules (each expressed as more graph, reusing existing `OpType`s):
@@ -823,14 +825,16 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
   - `Div(a,b)` → **quotient rule** `div(sub(mul(diff a, b), mul(a, diff b)), pow(b, 2))`.
   - `Pow(a,k)` → **power + chain** `mul(mul(Const k, pow(a, k−1)), diff a)`.
   - `Sin(a)`→`mul(cos(a), diff a)`; `Cos(a)`→`mul(neg(sin(a)), diff a)`; `Exp(a)`→`mul(exp(a), diff a)`; `Ln(a)`→`mul(div(Const 1, a), diff a)`. (Each is the **chain rule**: outer local derivative × `diff` of the inner.)
-- **Measure the swell:** take a nested expression (e.g. a product/chain a few levels deep), record the original node count, then the raw `diff` output's node count — it should be conspicuously larger (unsimplified product rule duplicates subtrees). `diff` a *second* time and watch it balloon again (motivates TICKET-451).
+- **Formula pretty-printer:** `fn to_expr_string(&self, root: usize) -> String`: recurse the subgraph rooted at `root` and emit readable infix, parenthesizing by operator precedence. Makes symbolic diff human-legible (used to print `f` and `df/dx` in the swell bench) and is the frontend's formula artifact. A graph utility, not autodiff-specific — lives under `graph/` alongside the other node utilities.
+- **Measure the swell:** take a nested expression (e.g. a product/chain a few levels deep), record the original node count, then the raw `diff` output's node count — it should be conspicuously larger (unsimplified product rule duplicates subtrees).
 - **Then fight it:** run the Phase 4 pipeline (const-fold + CSE + DCE) on the symbolic derivative and record the post-optimization node count. Const-folding kills the `*1`/`+0`/`Const` arithmetic the naive rules spray everywhere; CSE re-shares the duplicated subtrees. Log raw-vs-optimized to `bench/results/` alongside the TICKET-402 numbers.
 - **The punchline (write it as a comment/README note):** even optimized, symbolic diff needs **one `diff` pass per input variable** to get a full gradient (n passes for n inputs), whereas reverse-mode gets the whole gradient in **one** backward pass. That asymmetry — not correctness — is *why* AD exists.
 
 **Acceptance criteria:**
-- [ ] `diff` produces a derivative graph whose forward-evaluation matches the reverse-mode adjoint **and** the finite-difference oracle at several random points (three-way agreement) for ≥ 6 expressions.
-- [ ] Node-count table recorded: original vs raw-derivative vs optimized-derivative, showing the swell and the optimizer's reduction.
-- [ ] A short written note (comment or README) states why reverse-mode still beats symbolic for many-input gradients.
+- [x] `diff` produces a derivative graph whose forward-evaluation matches the reverse-mode adjoint **and** the finite-difference oracle at several random points (three-way agreement) for ≥ 6 expressions. *(`tests/symbolic_diff.rs`, 7 expressions.)*
+- [x] `to_expr_string` round-trips **by value**: re-compiling its output (Phase 3 front end) evaluates identically, and it renders hand-checked formulas correctly. *(Structural round-trip is not always possible — `^` needs a numeric-literal exponent and the lexer has no negative literal, so a `Pow` with a negative/fractional exponent prints but does not lower back.)*
+- [x] Node-count table recorded: original vs raw-derivative vs optimized-derivative, showing the swell and the optimizer's reduction. *(`bench/results/symbolic_swell.json`; README cites it.)*
+- [x] A short written note (comment or README) states why reverse-mode still beats symbolic for many-input gradients. *(README “Symbolic differentiation” section.)*
 
 🦀 **Rust concepts introduced:** recursion that **mutates the arena while returning a fresh index** (watch the borrow checker — compute child indices into locals *before* the `push` that consumes them, same lesson as TICKET-103); `match` on `OpType` dispatching to per-op rules; reusing the TICKET-101 builder helpers as the "constructors" of the derivative graph; composing existing passes as a library.
 
@@ -840,6 +844,8 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 
 #### TICKET-451 — Higher-order derivatives (f″, Hessian) via repeated symbolic diff
 **Branch:** `feat/451-higher-order`
+
+> **DEFERRED (not planned).** A pure bonus that nothing downstream depends on — Newton and inverse kinematics are first-order and use reverse-mode Jacobians, never second derivatives. Kept here as a fully-specified idea in case it is ever revisited; if picked up, note that the "optimize between rounds" step would want the `extract_subgraph` isolation helper so each `diff` round works on its own compact arena rather than one ever-growing shared one.
 
 **Description:** The clean bonus symbolic diff hands you almost for free: because `diff` returns *another expression graph*, you can differentiate the result again. Compute second derivatives and a Hessian by composing `diff` with itself — something reverse-mode doesn't give you directly.
 
