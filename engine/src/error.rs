@@ -17,4 +17,5 @@ pub enum EngineError {
         expected: String,    // human description of what was wanted, e.g. "`)`"
         found: String,       // the token actually seen, e.g. "Eof"
     },
+    SingularMatrix,          // LU found a zero pivot even after pivoting: A x = b has no unique solution
 }
