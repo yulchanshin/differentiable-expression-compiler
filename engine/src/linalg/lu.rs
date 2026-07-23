@@ -18,27 +18,54 @@ use crate::error::EngineError;
 /// Pivot magnitude below which a pivot column is treated as dependent (singular).
 const PIVOT_EPSILON: f64 = 1e-12;
 
+/// The factors from [`lu_decompose`]: unit-lower `L`, upper `U`, and the row
+/// permutation `piv`.
+pub type LuFactors = (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<usize>);
+
 /// Factor `a` into `(L, U, piv)` with partial pivoting so that `P A = L U`.
 ///
 /// `L` is unit-lower-triangular, `U` is upper-triangular, and `piv` is the row
 /// permutation (original row `piv[i]` ends up at row `i`). Returns
 /// [`EngineError::SingularMatrix`] if a pivot is ~0 even after the swap.
-pub fn lu_decompose(
-    a: &[Vec<f64>],
-) -> Result<(Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<usize>), EngineError> {
-    // Plan (Doolittle with partial pivoting):
-    //   1. n = a.len(); start piv = [0, 1, …, n-1]; copy `a` into a working
-    //      matrix `m` you can overwrite in place.
-    //   2. For each column k in 0..n:
-    //        a. Find the row p in k..n whose |m[p][k]| is largest (the pivot).
-    //        b. If |m[p][k]| < PIVOT_EPSILON → Err(SingularMatrix).
-    //        c. Swap rows k and p in `m`, and swap piv[k]/piv[p] to record it.
-    //        d. For each row i in (k+1)..n: factor = m[i][k] / m[k][k];
-    //           store that multiplier at m[i][k], then eliminate across the row
-    //           m[i][j] -= factor * m[k][j] for j in (k+1)..n.
-    //   3. Split `m` into L (unit diagonal, multipliers below it) and U (the
-    //      diagonal and above). Return (l, u, piv).
-    todo!("Doolittle elimination with partial pivoting")
+pub fn lu_decompose(a: &[Vec<f64>]) -> Result<LuFactors, EngineError> {
+    let n = a.len();
+    // Work in place on a copy; `m` ends up holding L's multipliers below the
+    // diagonal and U on/above it (the packed Doolittle form).
+    let mut m: Vec<Vec<f64>> = a.to_vec();
+    let mut piv: Vec<usize> = (0..n).collect();
+
+    for k in 0..n {
+        // Partial pivot: the largest-magnitude entry in column k over rows k..n.
+        let p = (k..n)
+            .max_by(|&i, &j| m[i][k].abs().total_cmp(&m[j][k].abs()))
+            .unwrap();
+        if m[p][k].abs() < PIVOT_EPSILON {
+            return Err(EngineError::SingularMatrix);
+        }
+        m.swap(k, p);
+        piv.swap(k, p);
+
+        // Eliminate below the pivot, caching each multiplier where the zero it
+        // creates would go.
+        for i in (k + 1)..n {
+            let factor = m[i][k] / m[k][k];
+            m[i][k] = factor;
+            for j in (k + 1)..n {
+                m[i][j] -= factor * m[k][j];
+            }
+        }
+    }
+
+    // Unpack: L is unit-lower (multipliers below the diagonal), U is the
+    // diagonal and above.
+    let mut l = vec![vec![0.0; n]; n];
+    let mut u = vec![vec![0.0; n]; n];
+    for i in 0..n {
+        l[i][i] = 1.0;
+        l[i][..i].copy_from_slice(&m[i][..i]);
+        u[i][i..].copy_from_slice(&m[i][i..]);
+    }
+    Ok((l, u, piv))
 }
 
 /// Solve `A x = b` given the factors from [`lu_decompose`].
@@ -47,13 +74,24 @@ pub fn lu_decompose(
 /// back-substitutes `U x = y`. Infallible: singularity was already caught during
 /// decomposition, so every `U[i][i]` here is nonzero.
 pub fn lu_solve(l: &[Vec<f64>], u: &[Vec<f64>], piv: &[usize], b: &[f64]) -> Vec<f64> {
-    // Plan:
-    //   1. Permute: pb[i] = b[piv[i]].
-    //   2. Forward solve L y = pb (L unit-lower): for i in 0..n,
-    //        y[i] = pb[i] - Σ_{j<i} l[i][j] * y[j].
-    //   3. Back solve U x = y: for i in (0..n).rev(),
-    //        x[i] = (y[i] - Σ_{j>i} u[i][j] * x[j]) / u[i][i].
-    todo!("forward + back substitution")
+    let n = b.len();
+    // Apply the same row permutation the factoring used.
+    let pb: Vec<f64> = piv.iter().map(|&i| b[i]).collect();
+
+    // Forward solve L y = P b (L unit-lower, so no divide).
+    let mut y = vec![0.0; n];
+    for i in 0..n {
+        let s: f64 = (0..i).map(|j| l[i][j] * y[j]).sum();
+        y[i] = pb[i] - s;
+    }
+
+    // Back solve U x = y.
+    let mut x = vec![0.0; n];
+    for i in (0..n).rev() {
+        let s: f64 = ((i + 1)..n).map(|j| u[i][j] * x[j]).sum();
+        x[i] = (y[i] - s) / u[i][i];
+    }
+    x
 }
 
 #[cfg(test)]
