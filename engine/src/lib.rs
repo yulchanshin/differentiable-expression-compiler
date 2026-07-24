@@ -1,4 +1,5 @@
 //! Gradient Engine: compiler + autodiff + solvers.
+pub mod api;
 pub mod autodiff;
 pub mod error;
 pub mod graph;

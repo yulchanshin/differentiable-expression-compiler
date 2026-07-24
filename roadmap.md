@@ -888,8 +888,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 **Description:** Wrap the engine in a small Rust web service so the TypeScript frontend can call it directly. This is your first async Rust — kept minimal.
 
 **Detail:**
-- Use `axum` + `tokio`. Endpoints: `POST /functions` (parse+lower+optimize, return an id + variables), `POST /eval`, `POST /grad`, `POST /jacobian`, `POST /trace`, `POST /solve` (returns the full iteration history; live streaming is TICKET-601).
-- Requests/responses are serde structs. Keep an in-memory map of compiled functions (id → Graph) behind a `Mutex` or `tokio` state.
+- Use `axum` + `tokio`. **This ticket ships four endpoints:** `POST /functions` (parse+lower, return an id + variables), `POST /eval`, `POST /grad`, `POST /trace`.
+- **Deferred from this ticket:** `POST /jacobian` — degenerate for a single-expression function (a scalar `f`'s Jacobian is just its gradient, so it adds no capability); revisit only if a multi-output function type is introduced. `POST /solve` — IK-specific (takes an arm + target, not a compiled function), so it lands with the IK-arm frontend work, not here.
+- Requests/responses are serde structs. Keep an in-memory map of compiled functions (id → Graph) behind a `Mutex` (locked per request; engine ops are sync, so no lock is held across an `.await`).
 - Engine logic stays sync/pure; only the thin HTTP layer is async.
 
 **Acceptance criteria:**
