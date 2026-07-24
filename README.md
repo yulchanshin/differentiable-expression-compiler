@@ -32,9 +32,9 @@ optimizer, solvers, and surrounding service layers are scaffolded and land next
 | Trace export for visualization              | Implemented |
 | Optimizer (const-fold, CSE, dead-node)      | Implemented |
 | Symbolic differentiation + formula printer  | Implemented |
-| Solvers (Newton, inverse kinematics)        | Planned     |
-| Dense linear algebra (LU with pivoting)     | Planned     |
-| Go service layer + browser visualizer       | Planned     |
+| Dense linear algebra (LU with pivoting)     | Implemented |
+| Inverse-kinematics solver (damped least squares) | Implemented |
+| HTTP/WebSocket service (axum) + browser visualizer | Planned     |
 
 ## The one mental model
 
@@ -75,13 +75,13 @@ Zoomed out to the end-to-end system this repository builds toward. Every layer
 lives in this monorepo; most are still planned. The engine stands alone as Tier
 1: callable as a library or a thin CLI, it already shows gradients, Jacobians,
 and solvers working. The surrounding layers turn a good engine into a full-stack
-service. The language boundary sits at a genuine compute-versus-serving seam:
-Rust owns exact, fast numerical computation and the compiler, Go owns
-orchestration and durability (Temporal is Go-native), and TypeScript owns the
-visualization.
+service. A thin `axum` layer exposes the engine over HTTP and WebSocket directly,
+and a TypeScript frontend drives it. The compute-versus-serving seam stays inside
+the Rust service — a pure engine core behind an async shell — so there is no
+second backend language between the browser and the math.
 
 ```
-   FULL SYSTEM (browser + Go service + Rust engine)
+   FULL SYSTEM (browser + Rust service)
 
 ```
                     +-----------------------------------------------+
@@ -92,24 +92,17 @@ visualization.
                                             |  WebSocket (JSON frames) + REST
                                             v
         +-------------------------------------------------------------------+
-        |                    GO SERVICE LAYER (BFF)                         |   [planned]
-        |  REST, WebSocket streaming, Temporal client, Postgres            |
-        +----------+----------------------------+-------------------+-------+
-                   | HTTP/JSON (or gRPC)         | Temporal          | SQL
-                   v                             v                   v
-      +--------------------------+   +--------------------+   +--------------+
-      |   RUST ENGINE (service)  |   |  TEMPORAL SERVER   |   |  POSTGRES    |
-      |   the whole compiler:    |   |  durable, resumable|   |  saved       |
-      |   lex -> parse ->        |   |  solver workflows  |   |  functions,  |
-      |   graph IR -> optimizer  |   |                    |   |  run history |
-      |   -> forward/reverse AD  |   +--------------------+   +--------------+
-      |   -> LU / Newton / IK    |        [planned]                [planned]
-      +--------------------------+
-              [built]
+        |                 RUST ENGINE SERVICE  (one crate)                 |
+        |  thin axum async shell: REST + WebSocket streaming     [planned] |
+        |  ---------------------------------------------------------------  |
+        |  sync, pure engine core:                                         |
+        |  lex -> parse -> graph IR -> optimizer                           |
+        |  -> forward/reverse AD -> LU / IK                       [built]  |
+        +-------------------------------------------------------------------+
 ```
 
-Tier 1 stops at the Rust engine. Go, Temporal, and the browser visualizer are
-additive layers that do not change the engine's design.
+Tier 1 stops at the engine core. The axum service layer and the browser
+visualizer are additive layers that do not change the engine's design.
 
 ## Quick start
 
@@ -490,34 +483,26 @@ cargo run --example node_count_bench   # from engine/, regenerates the artifact
 
 ### Solvers
 
-Iterative solvers built on the Jacobian.
+**Inverse kinematics** for a small planar arm, built on the engine's Jacobian.
+Given joint angles $\theta$, the forward-kinematics map $p(\theta)$ gives the
+end-effector position; reaching a target $t$ means driving $p(\theta) \to t$. The
+solver uses **damped least squares**: each step forms the tip-space error
+$e = t - p(\theta)$, takes the Jacobian $J = \partial p / \partial \theta$ (which
+reverse-mode AD produces directly), and solves the small damped system
 
-**Newton's method** for root finding. To solve $f(x) = 0$, repeat until
-$\lVert f(x) \rVert$ is small:
+$$(J J^\top + \lambda^2 I)\, y = e, \qquad \Delta\theta = J^\top y.$$
 
-$$J(x_k)\,\Delta x = -f(x_k), \qquad x_{k+1} = x_k + \Delta x.$$
-
-Each step evaluates $f$ and its Jacobian $J$, then solves one dense linear
-system for the step $\Delta x$.
-
-**Inverse kinematics** for a small planar arm. Given joint angles $\theta$, the
-forward-kinematics map $p(\theta)$ gives the end-effector position; reaching a
-target $t$ means solving $p(\theta) = t$. This is Newton's method on
-$f(\theta) = p(\theta) - t$, whose Jacobian $\partial p / \partial \theta$ is
-exactly what reverse-mode AD produces.
-
-Both need a dense linear solve, so an **LU decomposition with partial pivoting**
-lands alongside them.
-
-```rust
-// to come
-```
+The $\lambda^2 I$ damping keeps the system well-conditioned at singular (fully
+extended) poses, where an undamped pseudoinverse would diverge. The dense solve
+uses an **LU decomposition with partial pivoting** (`linalg/lu.rs`). Both land as
+`solver/ik.rs` and are validated by a reaching test plus a singular-start
+stability test.
 
 ### Service layer and visualizer
 
-A Go service fronts the engine over the wire, and a TypeScript visualizer
-animates the differentiation on the actual graph, plus an inverse-kinematics arm
-that reaches toward a clicked target.
+A thin `axum` layer (HTTP + WebSocket) exposes the engine over the wire from Rust
+itself, and a TypeScript visualizer animates the differentiation on the actual
+graph, plus an inverse-kinematics arm that reaches toward a clicked target.
 
 ## Project structure
 
@@ -529,13 +514,12 @@ engine/                  the Rust engine (this is the crate)
     autodiff/            forward eval, reverse-mode backward pass, Jacobian, trace
     ops/                 shared per-op evaluation and derivative rules
     optimize/            constant folding, CSE, dead-node elimination
-    solver/              Newton's method, inverse kinematics
+    solver/              inverse kinematics (damped least squares)
     linalg/              LU decomposition with partial pivoting
     error.rs             the engine's typed error enum
+    api/                 axum HTTP + WebSocket handlers                        [planned]
   tests/                 finite-difference validation, golden trace
 
-server/                  Go service layer: REST, WebSocket, Temporal client   [planned]
-worker/                  Go Temporal workflows for durable solver runs         [planned]
 web/                     TypeScript + React visualizer: graph, IK arm, plot    [planned]
 bench/                   node-count benchmark + results (reverse-vs-forward planned)
 ```
