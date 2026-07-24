@@ -1,6 +1,6 @@
 # Gradient Engine — Product Roadmap (Rust-Engine Edition)
 
-> A differentiable expression compiler & durable optimization service. Rust engine (the compiler + automatic differentiation + solvers), Go service layer, TypeScript visualizer. **Sequenced math-first so you learn Rust on the interesting part.**
+> A differentiable expression compiler. An all-Rust engine (the compiler + automatic differentiation + solvers) that serves itself over HTTP/WebSocket, with a TypeScript visualizer. **Sequenced math-first so you learn Rust on the interesting part.**
 
 **Duration:** ~3–5 weeks (Rust learning included) · **Owner:** Yulchan · **Last updated:** July 2026
 
@@ -25,11 +25,11 @@
 
 ## 1. Product Summary
 
-**Gradient Engine** takes a math function over several variables — e.g. `f(x, y) = sin(x*y) + x^2` — compiles it into a computational graph (a DAG), and can then evaluate it, differentiate it *exactly* via reverse-mode automatic differentiation (full gradient + Jacobian), and drive durable iterative solvers (Newton's method, inverse kinematics) on top of it. A live browser visualizer animates the differentiation happening on the actual graph, plus an IK arm that reaches toward a clicked target.
+**Gradient Engine** takes a math function over several variables — e.g. `f(x, y) = sin(x*y) + x^2` — compiles it into a computational graph (a DAG), and can then evaluate it, differentiate it *exactly* via reverse-mode automatic differentiation (full gradient + Jacobian), and drive an iterative solver (inverse kinematics) on top of it. A live browser visualizer animates the differentiation happening on the actual graph, plus an IK arm that reaches toward a clicked target.
 
-**Why it reads as SWE, not ML.** The bulk of the code is a real compiler pipeline — lexer → parser → graph IR → optimization passes → execution — plus a durable-orchestration layer and a full-stack visualizer. The calculus is the *payload*; the *substance* is PL/compilers + distributed systems + full-stack. It's deliberately aimed at solvers and a robot arm rather than neural nets.
+**Why it reads as SWE, not ML.** The bulk of the code is a real compiler pipeline — lexer → parser → graph IR → optimization passes → execution — plus a self-serving HTTP/WebSocket layer and a full-stack visualizer. The calculus is the *payload*; the *substance* is PL/compilers + automatic differentiation + full-stack. It's deliberately aimed at solvers and a robot arm rather than neural nets.
 
-**The Rust angle.** The entire engine — compiler front end, automatic differentiation, optimizer, and solvers — is written in **Rust**, which you're learning as you build. The Go service layer and TypeScript frontend surround it. The language boundary sits at a genuine *compute-vs-serving* seam (the Rust engine is its own service the Go layer calls), which is a normal, defensible architecture — not an artificial split through the middle of one component.
+**The Rust angle.** The entire engine — compiler front end, automatic differentiation, optimizer, and solvers — is written in **Rust**, which you're learning as you build. A thin `axum` HTTP/WebSocket layer wraps the engine so a TypeScript frontend can drive it directly. The *compute-vs-serving* seam lives **inside** the Rust service — a sync, pure engine core behind a thin async shell — so there is no artificial second language between the browser and the math.
 
 **The one mental model to hold onto:** *A computational graph is a DAG. The forward pass is a topological-order evaluation. The backward pass is a reverse-topological-order traversal that accumulates adjoints.* Everything hangs off that spine.
 
@@ -49,8 +49,8 @@ The sequence:
 2. **Autodiff core on hand-built graphs** (Phase 1) — you construct `f(x,y) = sin(x*y)+x²` *by manually wiring nodes in Rust*, no parser. Forward eval, then the reverse-mode backward pass, validated against finite differences. **This is where the project becomes real and where you learn the arena-graph pattern — the single most important Rust lesson here.**
 3. **Extend the math** (Phase 2) — more operations, Jacobians, and the trace data the visualizer will later animate.
 4. **Now the compiler front end** (Phase 3) — lexer + Pratt parser that produces the *same graph you've been building by hand*. By now you know Rust and you know the target, so this is low-stakes.
-5. **Optimizer, solvers, service** (Phases 4–6) — the rest of the Rust engine.
-6. **Go services, Temporal, frontend, benchmarks** (Phases 7–10) — everything around the engine.
+5. **Optimizer, solvers, service** (Phases 4–6) — the rest of the Rust engine, including the axum HTTP/WebSocket layer.
+6. **Frontend & benchmarks** (Phases 9–10) — the TypeScript visualizer and the headline benchmark.
 
 **Why this is better for you specifically:** you get a working gradient engine (the cool part) in the first week or so, you learn Rust's ownership model on the DAG where it's genuinely challenging (rather than dodging it), and the parser — normally the intimidating "start" of a compiler — becomes a comfortable mid-project task instead of a Rust-and-compilers double-whammy on day one.
 
@@ -65,19 +65,19 @@ The sequence:
 - **Rust warmup + autodiff core on hand-built graphs (Phases 0–2): the meat of the learning.** Slower at first as Rust ownership clicks; expect the arena-graph and backward-pass tickets to take real time. But this is where you *learn Rust*, so the time is the point, not waste.
 - **Compiler front end (Phase 3): faster than it looks** once you know Rust — parsing a tree is Rust's *easy* case (single ownership).
 - **Solvers + service (Phases 4–6): moderate.**
-- **Go services + Temporal + frontend (Phases 7–10): as before**, unaffected by the Rust decision except that Go now calls the Rust engine over a wire.
+- **Frontend + benchmarks (Phases 9–10): moderate.** The Rust service exposes HTTP/WebSocket directly; the TypeScript visualizer consumes it, no separate backend.
 
 **Confidence tiers** — treat **Tier 1 as the real deadline**; everything above is bonus you add while already applying.
 
 | Tier | Target | Confidence | Contents |
 |---|---|---|---|
 | **Tier 1 — resume-ready** | ~end of week 2–3 | **High** | Phases 0–3 (Rust warmup + autodiff core + Jacobian + parser) + one solver + a minimal visualizer + README with finite-diff validation and the reverse-vs-forward benchmark. A complete, cool, **all-Rust compiler + autodiff engine**. If you stop here, you've won *and* you've learned Rust. |
-| **Tier 2 — the full system** | week 3–4 | **Good** | Add the Go service layer + Temporal durability + crash/resume + the animated graph visualizer. This makes it a distributed full-stack system. |
-| **Tier 3 — polish** | ongoing while applying | **Nice-to-have** | IK arm canvas, convergence plot, extra optimization passes, damped least squares, Postgres. |
+| **Tier 2 — the full system** | week 3–4 | **Good** | Add the axum HTTP/WebSocket layer + the animated graph visualizer + the live IK arm. This makes it an interactive full-stack system. |
+| **Tier 3 — polish** | ongoing while applying | **Nice-to-have** | Convergence plot, extra optimization passes, the workspace-reachability heatmap. |
 
-**Cut order if short on time:** Postgres → extra optimization passes → DLS (ship Jacobian-transpose IK only) → convergence plot → IK arm. **Never cut:** the autodiff core, the parser, and (Tier 2) Temporal + the graph visualizer.
+**Cut order if short on time:** workspace heatmap → extra optimization passes → convergence plot → IK arm canvas. **Never cut:** the autodiff core, the parser, and (Tier 2) the graph visualizer.
 
-> Note the shape shift from the Go plan: here, **Tier 1 is itself a complete Rust project** (engine + compiler, no Go needed). The Go/Temporal/frontend work is genuinely Tier 2+. This means even a "half-finished" outcome is a finished, standalone, impressive thing.
+> **Tier 1 is itself a complete Rust project** (engine + compiler, exercised via CLI or a thin HTTP endpoint). The service layer and frontend are genuinely Tier 2+. This means even a "half-finished" outcome is a finished, standalone, impressive thing.
 
 ---
 
@@ -145,10 +145,9 @@ A 2D jointed arm: end-effector position `p(θ)` is a function of joint angles. T
 
 > **Read:** Bob Nystrom, *"Pratt Parsers: Expression Parsing Made Easy"*; the Pratt chapter of *Crafting Interpreters*.
 
-### 4.8 Temporal & WebSocket (Phase 7+)
+### 4.8 WebSocket streaming (Phase 6)
 
-- **Temporal** (Go SDK): durable workflows + activities; state checkpointed via event history, so a crashed worker replays and resumes. Your solver loop becomes a workflow.
-- **WebSocket:** real-time JSON frames from Go to the browser (AD trace + solver progress).
+- **WebSocket:** the axum layer streams real-time JSON frames straight from the Rust engine to the browser (AD trace + per-iteration solver progress). Client-paced playback animates the recorded history, so the solve itself never needs to be slow.
 
 ---
 
@@ -212,17 +211,13 @@ You'll internalize this in TICKET-100, and once it clicks, the rest of the engin
 
 | Layer | Technology | Role | Notes |
 |---|---|---|---|
-| **Engine** (compiler + autodiff + solvers) | **Rust** | Lexer, Pratt parser, graph IR, forward/reverse AD, optimizer, LU, Newton, IK. Runs as its own service. | The whole computational core; where you learn Rust |
+| **Engine** (compiler + autodiff + solvers) | **Rust** | Lexer, Pratt parser, graph IR, forward/reverse AD, optimizer, LU, IK. Runs as its own service. | The whole computational core; where you learn Rust |
 | Engine crates | `serde`/`serde_json` (serialization), `axum` + `tokio` (HTTP, Tier 2) | Expose the engine over HTTP/JSON | Added only when the service ticket needs them |
-| Engine ↔ Go transport | **HTTP/JSON** (or gRPC) | Go calls the Rust engine as a service | HTTP is less setup; gRPC is a better story if you want it |
-| Service / orchestration (BFF) | **Go** (`net/http` + `websocket`) | REST, WebSocket streaming, Temporal client, Postgres | Tier 2 |
-| Durability | **Temporal (Go SDK)** | Durable, resumable solver workflows | Tier 2 |
-| Persistence | **Postgres** (`sqlc` or `pgx`, no ORM) | Saved functions, run history | Tier 3, first to cut |
+| Serving layer | **Rust** (`axum` + `tokio`) | HTTP/JSON endpoints + WebSocket streaming, inside the engine crate | Tier 2 |
 | Frontend / visualizer | **TypeScript + React + Vite**, **D3 + dagre**, Canvas | Animated AD graph, IK arm, convergence plot | Tier 2/3 |
-| Browser streaming | **WebSocket** | Go ↔ browser real-time frames | Tier 2 |
-| Infra | **Docker Compose** | Rust engine + Go server + Temporal + Postgres locally | |
+| Browser streaming | **WebSocket** | Rust ↔ browser real-time frames | Tier 2 |
 
-**The split rationale (interview-ready):** Rust owns the engine because that's where exact, fast numerical computation and the compiler live — the part worth the borrow-checker investment. Go owns orchestration because Temporal is Go-native and Go excels at concurrent service glue. The boundary is a real compute-vs-serving seam, so it's a sound architecture, not a language gimmick.
+**The architecture rationale (interview-ready):** the whole backend is Rust behind a TypeScript UI. Inside the Rust service the compute-vs-serving seam is real but *internal* — a sync, pure engine core (the compiler + AD, where the borrow-checker investment pays off) behind a thin async `axum` shell that only does I/O. No second backend language sits between the browser and the math, so there is nothing artificial to defend.
 
 ---
 
@@ -239,27 +234,21 @@ You'll internalize this in TICKET-100, and once it clicks, the rest of the engin
                                     │  WebSocket (JSON frames) + REST
                                     ▼
         ┌───────────────────────────────────────────────────────────┐
-        │                  GO SERVICE LAYER (BFF)  [Tier 2]          │
-        │  REST · WebSocket · Temporal client · Postgres            │
-        └───────┬──────────────────────┬───────────────────┬────────┘
-                │ HTTP/JSON (or gRPC)   │ Temporal          │ SQL
-                ▼                       ▼                   ▼
-   ┌────────────────────────┐  ┌──────────────────┐  ┌──────────────┐
-   │  RUST ENGINE (service) │  │  TEMPORAL SERVER │  │  POSTGRES    │
-   │  ── the whole compiler │  │  durable solver  │  │  functions,  │
-   │  lexer → parser →      │  │  workflows       │  │  runs        │
-   │  graph IR → optimizer  │  │                  │  │              │
-   │  → forward/reverse AD  │  └──────────────────┘  └──────────────┘
-   │  → LU/Newton/IK        │
-   └────────────────────────┘
-        ▲
-        │  Tier 1 stops here: the Rust engine alone (callable via CLI
-        │  or a thin HTTP endpoint) is already a complete project.
+        │            RUST ENGINE SERVICE  (one crate)  [Tier 2]      │
+        │  thin axum async shell: REST + WebSocket streaming         │
+        │  ───────────────────────────────────────────────────────  │
+        │  sync, pure engine core:                                   │
+        │  lexer → parser → graph IR → optimizer                     │
+        │  → forward/reverse AD → LU/IK                              │
+        └───────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │  Tier 1 stops at the core: callable via CLI
+                                    │  or a thin HTTP endpoint, already complete.
 ```
 
 ### 7.2 Tier 1 is standalone
 
-Crucially, the Rust engine does **not** need Go to be a finished, demoable project. In Tier 1 you can exercise it via a small CLI or a single HTTP endpoint and show gradients, Jacobians, and a solver working. Go, Temporal, and the browser viz are Tier 2+ additions that turn a great *engine* into a great *system*.
+Crucially, the engine core is a finished, demoable project on its own. In Tier 1 you exercise it via a small CLI or a single HTTP endpoint and show gradients, Jacobians, and a solver working. The axum serving layer and the browser viz are Tier 2+ additions that turn a great *engine* into a great *system*.
 
 ### 7.3 The engine ↔ frontend trace contract (build early, in Rust)
 
@@ -292,7 +281,6 @@ Two ordered arrays over a shared node list — all the frontend needs to animate
 ```
 gradient-engine/
 ├── README.md                       # headline result + benchmark + the derivation
-├── docker-compose.yml              # rust-engine, go-server, temporal, postgres  [Tier 2]
 ├── Makefile
 │
 ├── engine/                         # ← RUST. The whole compiler + AD + solvers.
@@ -325,27 +313,13 @@ gradient-engine/
 │       ├── linalg/
 │       │   └── lu.rs               # LU decomposition
 │       ├── solver/
-│       │   ├── newton.rs
 │       │   └── ik.rs
 │       ├── error.rs                # custom error enum
-│       └── api/                    # ← Tier 2: HTTP handlers (axum)
-│           └── http.rs
+│       └── api/                    # ← Tier 2: axum HTTP + WebSocket handlers
+│           ├── http.rs
+│           └── ws.rs
 │   └── tests/
 │       └── finite_diff.rs          # ⭐ the correctness oracle
-│
-├── server/                         # ← GO. Service layer / BFF.  [Tier 2]
-│   ├── go.mod
-│   ├── main.go
-│   ├── engineclient/               # HTTP/gRPC client to the Rust engine
-│   ├── rest/
-│   ├── ws/                         # WebSocket: trace + solver streams
-│   └── store/                      # Postgres (sqlc/pgx)
-│
-├── worker/                         # ← GO. Temporal workflows + activities.  [Tier 2]
-│   ├── go.mod
-│   ├── main.go
-│   ├── workflow/solve_workflow.go
-│   └── activity/step_activity.go
 │
 ├── web/                            # ← TypeScript + React + Vite.  [Tier 2/3]
 │   └── src/
@@ -395,20 +369,14 @@ gradient-engine/
 
 ### Phase 5 — Solvers
 - [ ] `TICKET-500` LU linear solver
-- [ ] `TICKET-501` Newton's method
+- [ ] ~~`TICKET-501` Newton's method~~ — **descoped** (IK chosen as the sole solver; LU now feeds IK's DLS step)
 - [ ] `TICKET-502` IK solver (Jacobian-transpose → damped least squares)
 
-### Phase 6 — Rust engine as a service
+### Phase 6 — Rust engine as a service · Tier 2
 - [ ] `TICKET-600` Expose engine over HTTP/JSON (axum + serde)
+- [ ] `TICKET-601` WebSocket streaming (trace + solver)
 
-### Phase 7 — Go service layer (BFF) · Tier 2
-- [ ] `TICKET-700` Go server + engine client + REST
-- [ ] `TICKET-701` WebSocket streaming (trace + solver)
-- [ ] `TICKET-702` Postgres store · Tier 3
-
-### Phase 8 — Durability (Temporal, Go) · Tier 2
-- [ ] `TICKET-800` Temporal worker skeleton
-- [ ] `TICKET-801` Solve workflow + crash/resume demo
+> Phases 7–8 (Go BFF + Temporal durability) and the Postgres store were removed — the Rust service serves the frontend directly. See §3.
 
 ### Phase 9 — Frontend · Tier 2/3
 - [ ] `TICKET-900` App shell + REST wiring
@@ -420,7 +388,7 @@ gradient-engine/
 - [ ] `TICKET-1000` Reverse-vs-forward benchmark
 - [ ] `TICKET-1001` README: architecture, results, derivation
 
-**Tier 1 = Phases 0–3 + one solver (500/501 or 502) + a minimal way to show it + TICKET-1000/1001.** That alone is a finished, standalone, all-Rust compiler + autodiff engine.
+**Tier 1 = Phases 0–3 + one solver (500 or 502) + a minimal way to show it + TICKET-1000/1001.** That alone is a finished, standalone, all-Rust compiler + autodiff engine.
 
 ---
 
@@ -873,7 +841,7 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 #### TICKET-500 — LU linear solver
 **Branch:** `feat/500-lu-solver`
 
-**Description:** Dense `A x = b` solver via LU decomposition with partial pivoting — the workhorse inside Newton.
+**Description:** Dense `A x = b` solver via LU decomposition with partial pivoting — the workhorse inside IK's damped-least-squares step.
 
 **Detail:** `lu_decompose(a) -> (l, u, piv)`; `lu_solve(...) -> x`. Partial pivoting for stability; detect singular matrices (return `Result`).
 
@@ -887,20 +855,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 
 ---
 
-#### TICKET-501 — Newton's method
-**Branch:** `feat/501-newton`
+#### TICKET-501 — Newton's method  ·  ~~descoped~~
 
-**Description:** Solve `f(x)=0` for a vector using engine Jacobians + the LU solver.
-
-**Detail:** Loop: eval `f(x)`, build `J`, solve `J Δx = −f(x)`, update, stop on `‖f(x)‖ < tol` or max iters. Emit per-iteration `(x, ‖f(x)‖)` for streaming/plots.
-
-**Acceptance criteria:**
-- [ ] Converges on a known system (e.g. circle ∩ line) to the analytic root.
-- [ ] Records the quadratic-convergence tail (nice README figure).
-
-🦀 **Rust concepts introduced:** structuring an iterative algorithm; returning a result struct with history (`Vec<Iteration>`); norms over a `Vec`.
-
-**Learn/read:** Newton for systems; convergence conditions; damping/line search basics.
+> **DESCOPED (not planned).** IK is now the project's sole solver. Newton and IK are siblings — both first-order, both consuming engine Jacobians plus the LU solver — so nothing downstream depends on Newton. LU (TICKET-500) survives because IK's damped-least-squares step needs it. Kept here as a fully-specified idea in case it is ever revisited: solve `f(x)=0` by looping eval `f(x)` → build `J` → solve `J Δx = −f(x)` → update, until `‖f(x)‖ < tol`.
 
 ---
 
@@ -928,10 +885,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 #### TICKET-600 — Expose engine over HTTP/JSON (axum + serde)
 **Branch:** `feat/600-engine-service`
 
-**Description:** Wrap the engine in a small Rust web service so the Go layer (Tier 2) can call it. This is your first async Rust — kept minimal.
+**Description:** Wrap the engine in a small Rust web service so the TypeScript frontend can call it directly. This is your first async Rust — kept minimal.
 
 **Detail:**
-- Use `axum` + `tokio`. Endpoints: `POST /functions` (parse+lower+optimize, return an id + variables), `POST /eval`, `POST /grad`, `POST /jacobian`, `POST /trace`, `POST /solve` (returns iterations, or streams — streaming can wait for the Go WS layer).
+- Use `axum` + `tokio`. Endpoints: `POST /functions` (parse+lower+optimize, return an id + variables), `POST /eval`, `POST /grad`, `POST /jacobian`, `POST /trace`, `POST /solve` (returns the full iteration history; live streaming is TICKET-601).
 - Requests/responses are serde structs. Keep an in-memory map of compiled functions (id → Graph) behind a `Mutex` or `tokio` state.
 - Engine logic stays sync/pure; only the thin HTTP layer is async.
 
@@ -945,88 +902,20 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 
 ---
 
-### PHASE 7 — Go service layer (BFF) · Tier 2
+#### TICKET-601 — WebSocket streaming (trace + solver)
+**Branch:** `feat/601-ws-streaming`
 
-> Back in familiar Go territory. This layer calls the Rust engine over HTTP, adds WebSocket streaming to the browser, and (Tier 3) Postgres. No Rust here.
+**Description:** Stream the AD animation trace and per-iteration solver state to the browser over WebSocket, straight from the axum layer — no separate backend.
 
----
-
-#### TICKET-700 — Go server + engine client + REST
-**Branch:** `feat/700-go-bff`
-
-**Description:** A Go service that proxies/orchestrates the Rust engine and serves the browser.
-
-**Detail:** `engineclient` package wrapping the Rust engine's HTTP API (typed Go structs). REST endpoints for submit/eval/grad that call through. Thin handlers; all math stays in Rust.
-
-**Acceptance criteria:**
-- [ ] Submit → eval → grad works end-to-end through Go → Rust.
-- [ ] Engine errors surface as clean Go HTTP errors.
-
-**Learn/read:** Go `net/http`; JSON client patterns; separating transport from the engine.
-
----
-
-#### TICKET-701 — WebSocket streaming (trace + solver)
-**Branch:** `feat/701-ws-streaming`
-
-**Description:** Stream the AD animation trace and per-iteration solver state to the browser over WebSocket.
-
-**Detail:** `/ws/trace` fetches a trace from the engine and streams graph → forward steps → backward steps. `/ws/solve` starts a solve (direct now; Temporal in Phase 8) and forwards each iteration; client-paced animation preferred.
+**Detail:** `/ws/trace` sends graph → forward steps → backward steps for a compiled function; `/ws/solve` runs a solve and forwards each iteration frame. Client-paced playback is preferred, so the recorded history animates smoothly even though the solve itself is near-instant. Closing the socket cancels the in-flight work.
 
 **Acceptance criteria:**
 - [ ] Browser receives ordered trace frames and ordered solver iterations.
-- [ ] Cancellation via socket close stops server work (`context.Context`).
+- [ ] Closing the socket stops server-side work.
 
-**Learn/read:** `gorilla/websocket` or `nhooyr/websocket`; framing a WS protocol; Go context cancellation.
+🦀 **Rust concepts introduced:** `axum` WebSocket upgrades; streaming from an async handler; cancellation on connection drop; calling the sync engine core from async code.
 
----
-
-#### TICKET-702 — Postgres store · Tier 3
-**Branch:** `feat/702-postgres`
-
-**Description:** Minimal persistence for saved functions and solver-run history. First thing to cut if short on time.
-
-**Detail:** Tables `functions`, `solver_jobs`, `solver_runs`. Access via `sqlc` (typed SQL) or `pgx` raw. **No ORM.**
-
-**Acceptance criteria:**
-- [ ] Migrations apply on a fresh container; save/read round-trips.
-- [ ] Store has no engine/HTTP imports.
-
-**Learn/read:** `sqlc` quickstart; `pgxpool`.
-
----
-
-### PHASE 8 — Durability (Temporal, Go) · Tier 2
-
----
-
-#### TICKET-800 — Temporal worker skeleton
-**Branch:** `feat/800-temporal-worker`
-
-**Description:** Stand up a Temporal worker registering a trivial workflow+activity, proving connectivity.
-
-**Detail:** `worker/main.go` connects to the dev server, registers on task queue `solver-tq`; a ping workflow validates the loop end-to-end.
-
-**Acceptance criteria:**
-- [ ] Ping workflow completes and shows in the Temporal UI.
-
-**Learn/read:** Temporal Go SDK setup; Worker/TaskQueue concepts; the dev server UI.
-
----
-
-#### TICKET-801 — Solve workflow + crash/resume demo
-**Branch:** `feat/801-solve-workflow`
-
-**Description:** Model the iterative solver as a durable workflow — each iteration is a checkpointed step — then demo the money shot: kill the worker mid-solve, watch it resume at iteration N.
-
-**Detail:** `SolveWorkflow` loops calling `StepActivity` (which calls the Rust engine for eval + Jacobian + step), appending to workflow state, checking convergence. Workflow code stays **deterministic** (no direct IO/time/random — those live in activities). Wire progress into `/ws/solve`. Document a repeatable `docker kill` mid-solve → restart → continuation.
-
-**Acceptance criteria:**
-- [ ] A solve runs to convergence entirely through the workflow.
-- [ ] Repeatable crash-resume visibly continues rather than restarting.
-- [ ] Passes the Temporal replay test.
-
-**Learn/read:** Temporal determinism rules; activities vs workflow code; the test framework + replay testing; activity idempotency.
+**Learn/read:** `axum` WebSocket example; `tokio` channels; framing a WS protocol.
 
 ---
 
@@ -1079,10 +968,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 #### TICKET-903 — Convergence plot · Tier 3
 **Branch:** `feat/903-convergence-plot`
 
-**Description:** Live line chart of solver error vs iteration, streamed in real time (log-scale y optional to show Newton's quadratic tail).
+**Description:** Live line chart of solver error vs iteration, streamed in real time (log-scale y optional to show the convergence tail).
 
 **Acceptance criteria:**
-- [ ] Plot updates live; Newton runs show fast late convergence.
+- [ ] Plot updates live; solver runs show convergence toward the target.
 
 **Learn/read:** a lightweight D3 line chart; streaming data into a chart.
 
@@ -1140,10 +1029,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 | Lowering | dedup/shared nodes | node counts; parity with hand-built graph |
 | Optimizer | value preservation | property test: random points match pre/post |
 | LU | `A x = b` | residual `‖Ax−b‖ < 1e-9` |
-| Newton/IK | convergence | assert root / tip within tolerance |
+| IK | convergence | assert tip within tolerance |
 | Trace | ordering + schema | golden file |
-| Workflow (Tier 2) | determinism | Temporal replay test |
-| Service (Tier 2) | round-trips, errors | HTTP client tests |
+| Service (Tier 2) | round-trips, errors | axum handler / HTTP client tests |
 
 **Property testing** fits the optimizer perfectly: for a random expression and point, value must be identical before and after each pass. Rust's `proptest` crate is a good fit (and a nice extra Rust thing to learn).
 
@@ -1152,7 +1040,7 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 1. **Reverse vs. forward/finite-difference cost as input dimension grows** (TICKET-1000) — the headline; reverse ≈ flat, others ≈ linear. This *is* why backprop scales; measuring it is your strongest single artifact.
 2. **Graph node count before/after optimization passes** (TICKET-402) — the "compiler engineer" signal.
 
-Optional third: **Newton quadratic-convergence tail** — log-scale error-vs-iteration.
+Optional third: **IK convergence tail** — log-scale tip-error-vs-iteration.
 
 ### 11.3 Definition of done
 
@@ -1162,9 +1050,9 @@ Optional third: **Newton quadratic-convergence tail** — log-scale error-vs-ite
 - [ ] Reverse-vs-forward benchmark + README with the derivation.
 
 **Tier 2 (the full system):**
-- [ ] `docker compose up` → Rust engine + Go BFF + Temporal live.
+- [ ] Rust service (`cargo run`) serving HTTP + WebSocket; the TypeScript app connects.
 - [ ] Animated graph visualizer showing forward values then backward adjoints.
-- [ ] A solver run survives a worker crash and resumes mid-iteration.
+- [ ] Live IK arm reaching a clicked target, driven by the solver stream.
 
 ---
 
@@ -1172,20 +1060,20 @@ Optional third: **Newton quadratic-convergence tail** — log-scale error-vs-ite
 
 A line once you've shipped (trim clauses to match what you actually built):
 
-> *Built a differentiable expression compiler in **Rust** — hand-written lexer + Pratt parser, arena-based DAG intermediate representation, reverse-mode automatic differentiation, and constant-folding/CSE optimization passes — exposing exact gradient and Jacobian computation. Wrapped it as a service driving durable, resumable Newton and inverse-kinematics solvers orchestrated in Go with Temporal, with a real-time TypeScript/React + D3 visualizer animating the backward pass.*
+> *Built a differentiable expression compiler in **Rust** — hand-written lexer + Pratt parser, arena-based DAG intermediate representation, reverse-mode automatic differentiation, and constant-folding/CSE optimization passes — exposing exact gradient and Jacobian computation. Wrapped it in a Rust (`axum`) HTTP/WebSocket service driving a real-time inverse-kinematics solver, with a TypeScript/React + D3 visualizer animating the backward pass on the live graph.*
 
 **Tier-1-only version (accurate if you stop after the engine):**
 
 > *Built a differentiable expression compiler in **Rust**: lexer, Pratt parser, arena-based computation-graph IR, reverse-mode automatic differentiation, and optimization passes (constant folding, CSE), computing exact gradients and Jacobians. Validated against finite differences; benchmarked reverse-mode's constant-cost gradient vs. forward mode's linear scaling.*
 
-**Story vs. last project:** last time was distributed compute + SIMD + perf (Go/C++/gRPC/Redis/CMake). This is **compilers/PL + automatic differentiation + Rust + (Tier 2) durable orchestration + full-stack**. New languages/tech: Rust, Temporal, TypeScript/React, Postgres, WebSocket. The only carryover is Go (now orchestration) and Docker.
+**Story vs. last project:** last time was distributed compute + SIMD + perf (Go/C++/gRPC/Redis/CMake). This is **compilers/PL + automatic differentiation + Rust + full-stack**. New languages/tech: Rust, TypeScript/React, WebSocket. A focused, all-Rust backend behind a TypeScript UI — one language for the whole engine and its service, no artificial seam.
 
 **Interview talking points banked:**
 - Learning Rust on a graph-heavy project, and *why the arena/index pattern* beats `Rc<RefCell>` for a multi-parent DAG (a sophisticated Rust-ownership answer most beginners can't give).
 - Why AD ≠ symbolic ≠ numerical differentiation, and the reverse-mode cost asymmetry (with a benchmark).
 - Tree vs. graph ownership: the AST uses `Box` (single ownership), the IR uses an arena (shared) — and *why*.
 - Constant folding / CSE / dead-code elimination as real passes with measured wins.
-- (Tier 2) Modeling an iterative solver as a durable Temporal workflow; the Rust-engine / Go-orchestration split at a real compute-vs-serving seam.
+- (Tier 2) Exposing the engine over HTTP/WebSocket from Rust itself (`axum`), keeping the compute-vs-serving seam internal: a sync pure core behind a thin async shell.
 
 ---
 
