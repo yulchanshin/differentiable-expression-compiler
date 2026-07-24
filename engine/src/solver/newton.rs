@@ -1,2 +1,0 @@
-//newton.rs
-//!description incoming

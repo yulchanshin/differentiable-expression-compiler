@@ -1,6 +1,7 @@
 //! Dense linear solver: `A x = b` via LU decomposition with partial pivoting.
 //!
-//! The inner solve of Newton's method (TICKET-501): `J·Δx = −f(x)` every step.
+//! The inner solve of IK's damped-least-squares step (TICKET-502): each
+//! iteration solves `(JJᵀ + λ²I)·y = e` for the tip-space error `e`.
 //! Factor `A` once (O(n³)) into unit-lower `L` and upper `U`, then each solve is
 //! two O(n²) triangular passes — forward `L y = b`, back `U x = y` — reusable
 //! across right-hand sides. Partial pivoting swaps the largest-magnitude row

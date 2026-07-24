@@ -25,7 +25,7 @@
 
 ## 1. Product Summary
 
-**Gradient Engine** takes a math function over several variables — e.g. `f(x, y) = sin(x*y) + x^2` — compiles it into a computational graph (a DAG), and can then evaluate it, differentiate it *exactly* via reverse-mode automatic differentiation (full gradient + Jacobian), and drive durable iterative solvers (Newton's method, inverse kinematics) on top of it. A live browser visualizer animates the differentiation happening on the actual graph, plus an IK arm that reaches toward a clicked target.
+**Gradient Engine** takes a math function over several variables — e.g. `f(x, y) = sin(x*y) + x^2` — compiles it into a computational graph (a DAG), and can then evaluate it, differentiate it *exactly* via reverse-mode automatic differentiation (full gradient + Jacobian), and drive a durable iterative solver (inverse kinematics) on top of it. A live browser visualizer animates the differentiation happening on the actual graph, plus an IK arm that reaches toward a clicked target.
 
 **Why it reads as SWE, not ML.** The bulk of the code is a real compiler pipeline — lexer → parser → graph IR → optimization passes → execution — plus a durable-orchestration layer and a full-stack visualizer. The calculus is the *payload*; the *substance* is PL/compilers + distributed systems + full-stack. It's deliberately aimed at solvers and a robot arm rather than neural nets.
 
@@ -212,7 +212,7 @@ You'll internalize this in TICKET-100, and once it clicks, the rest of the engin
 
 | Layer | Technology | Role | Notes |
 |---|---|---|---|
-| **Engine** (compiler + autodiff + solvers) | **Rust** | Lexer, Pratt parser, graph IR, forward/reverse AD, optimizer, LU, Newton, IK. Runs as its own service. | The whole computational core; where you learn Rust |
+| **Engine** (compiler + autodiff + solvers) | **Rust** | Lexer, Pratt parser, graph IR, forward/reverse AD, optimizer, LU, IK. Runs as its own service. | The whole computational core; where you learn Rust |
 | Engine crates | `serde`/`serde_json` (serialization), `axum` + `tokio` (HTTP, Tier 2) | Expose the engine over HTTP/JSON | Added only when the service ticket needs them |
 | Engine ↔ Go transport | **HTTP/JSON** (or gRPC) | Go calls the Rust engine as a service | HTTP is less setup; gRPC is a better story if you want it |
 | Service / orchestration (BFF) | **Go** (`net/http` + `websocket`) | REST, WebSocket streaming, Temporal client, Postgres | Tier 2 |
@@ -250,7 +250,7 @@ You'll internalize this in TICKET-100, and once it clicks, the rest of the engin
    │  lexer → parser →      │  │  workflows       │  │  runs        │
    │  graph IR → optimizer  │  │                  │  │              │
    │  → forward/reverse AD  │  └──────────────────┘  └──────────────┘
-   │  → LU/Newton/IK        │
+   │  → LU/IK               │
    └────────────────────────┘
         ▲
         │  Tier 1 stops here: the Rust engine alone (callable via CLI
@@ -325,7 +325,6 @@ gradient-engine/
 │       ├── linalg/
 │       │   └── lu.rs               # LU decomposition
 │       ├── solver/
-│       │   ├── newton.rs
 │       │   └── ik.rs
 │       ├── error.rs                # custom error enum
 │       └── api/                    # ← Tier 2: HTTP handlers (axum)
@@ -395,7 +394,7 @@ gradient-engine/
 
 ### Phase 5 — Solvers
 - [ ] `TICKET-500` LU linear solver
-- [ ] `TICKET-501` Newton's method
+- [ ] ~~`TICKET-501` Newton's method~~ — **descoped** (IK chosen as the sole solver; LU now feeds IK's DLS step)
 - [ ] `TICKET-502` IK solver (Jacobian-transpose → damped least squares)
 
 ### Phase 6 — Rust engine as a service
@@ -420,7 +419,7 @@ gradient-engine/
 - [ ] `TICKET-1000` Reverse-vs-forward benchmark
 - [ ] `TICKET-1001` README: architecture, results, derivation
 
-**Tier 1 = Phases 0–3 + one solver (500/501 or 502) + a minimal way to show it + TICKET-1000/1001.** That alone is a finished, standalone, all-Rust compiler + autodiff engine.
+**Tier 1 = Phases 0–3 + one solver (500 or 502) + a minimal way to show it + TICKET-1000/1001.** That alone is a finished, standalone, all-Rust compiler + autodiff engine.
 
 ---
 
@@ -873,7 +872,7 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 #### TICKET-500 — LU linear solver
 **Branch:** `feat/500-lu-solver`
 
-**Description:** Dense `A x = b` solver via LU decomposition with partial pivoting — the workhorse inside Newton.
+**Description:** Dense `A x = b` solver via LU decomposition with partial pivoting — the workhorse inside IK's damped-least-squares step.
 
 **Detail:** `lu_decompose(a) -> (l, u, piv)`; `lu_solve(...) -> x`. Partial pivoting for stability; detect singular matrices (return `Result`).
 
@@ -887,20 +886,9 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 
 ---
 
-#### TICKET-501 — Newton's method
-**Branch:** `feat/501-newton`
+#### TICKET-501 — Newton's method  ·  ~~descoped~~
 
-**Description:** Solve `f(x)=0` for a vector using engine Jacobians + the LU solver.
-
-**Detail:** Loop: eval `f(x)`, build `J`, solve `J Δx = −f(x)`, update, stop on `‖f(x)‖ < tol` or max iters. Emit per-iteration `(x, ‖f(x)‖)` for streaming/plots.
-
-**Acceptance criteria:**
-- [ ] Converges on a known system (e.g. circle ∩ line) to the analytic root.
-- [ ] Records the quadratic-convergence tail (nice README figure).
-
-🦀 **Rust concepts introduced:** structuring an iterative algorithm; returning a result struct with history (`Vec<Iteration>`); norms over a `Vec`.
-
-**Learn/read:** Newton for systems; convergence conditions; damping/line search basics.
+> **DESCOPED (not planned).** IK is now the project's sole solver. Newton and IK are siblings — both first-order, both consuming engine Jacobians plus the LU solver — so nothing downstream depends on Newton. LU (TICKET-500) survives because IK's damped-least-squares step needs it. Kept here as a fully-specified idea in case it is ever revisited: solve `f(x)=0` by looping eval `f(x)` → build `J` → solve `J Δx = −f(x)` → update, until `‖f(x)‖ < tol`.
 
 ---
 
@@ -1079,10 +1067,10 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 #### TICKET-903 — Convergence plot · Tier 3
 **Branch:** `feat/903-convergence-plot`
 
-**Description:** Live line chart of solver error vs iteration, streamed in real time (log-scale y optional to show Newton's quadratic tail).
+**Description:** Live line chart of solver error vs iteration, streamed in real time (log-scale y optional to show the convergence tail).
 
 **Acceptance criteria:**
-- [ ] Plot updates live; Newton runs show fast late convergence.
+- [ ] Plot updates live; solver runs show convergence toward the target.
 
 **Learn/read:** a lightweight D3 line chart; streaming data into a chart.
 
@@ -1140,7 +1128,7 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 | Lowering | dedup/shared nodes | node counts; parity with hand-built graph |
 | Optimizer | value preservation | property test: random points match pre/post |
 | LU | `A x = b` | residual `‖Ax−b‖ < 1e-9` |
-| Newton/IK | convergence | assert root / tip within tolerance |
+| IK | convergence | assert tip within tolerance |
 | Trace | ordering + schema | golden file |
 | Workflow (Tier 2) | determinism | Temporal replay test |
 | Service (Tier 2) | round-trips, errors | HTTP client tests |
@@ -1152,7 +1140,7 @@ Every ticket has: number, title, branch, description, detail, acceptance criteri
 1. **Reverse vs. forward/finite-difference cost as input dimension grows** (TICKET-1000) — the headline; reverse ≈ flat, others ≈ linear. This *is* why backprop scales; measuring it is your strongest single artifact.
 2. **Graph node count before/after optimization passes** (TICKET-402) — the "compiler engineer" signal.
 
-Optional third: **Newton quadratic-convergence tail** — log-scale error-vs-iteration.
+Optional third: **IK convergence tail** — log-scale tip-error-vs-iteration.
 
 ### 11.3 Definition of done
 
@@ -1172,7 +1160,7 @@ Optional third: **Newton quadratic-convergence tail** — log-scale error-vs-ite
 
 A line once you've shipped (trim clauses to match what you actually built):
 
-> *Built a differentiable expression compiler in **Rust** — hand-written lexer + Pratt parser, arena-based DAG intermediate representation, reverse-mode automatic differentiation, and constant-folding/CSE optimization passes — exposing exact gradient and Jacobian computation. Wrapped it as a service driving durable, resumable Newton and inverse-kinematics solvers orchestrated in Go with Temporal, with a real-time TypeScript/React + D3 visualizer animating the backward pass.*
+> *Built a differentiable expression compiler in **Rust** — hand-written lexer + Pratt parser, arena-based DAG intermediate representation, reverse-mode automatic differentiation, and constant-folding/CSE optimization passes — exposing exact gradient and Jacobian computation. Wrapped it as a service driving a durable, resumable inverse-kinematics solver orchestrated in Go with Temporal, with a real-time TypeScript/React + D3 visualizer animating the backward pass.*
 
 **Tier-1-only version (accurate if you stop after the engine):**
 
